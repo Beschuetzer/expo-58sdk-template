@@ -1,4 +1,4 @@
 # TODOS
 
-- grab newest components from relationship-app
+- grab newest components from expo-58sdk-template
 - add code stuff for notifications?
