@@ -1,5 +1,5 @@
 {
-  "name": "expo-50sdk-template",
+  "name": "expo-58sdk-template",
   "version": "1.0.0",
   "workspaces": [
     "apps/*",
@@ -53,7 +53,7 @@
       }
     },
     "moduleNameMapper": {
-      "^@expo-50sdk-template/logging$": "<rootDir>/../../libs/logging/src/index.ts",
+      "^@expo-58sdk-template/logging$": "<rootDir>/../../libs/logging/src/index.ts",
       "^@/(.*)$": "<rootDir>/$1"
     },
     "setupFiles": [

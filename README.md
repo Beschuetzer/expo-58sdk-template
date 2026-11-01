@@ -45,7 +45,7 @@ clears the session and requires a new PKCE sign-in.
 
 Cross-application request and response contracts belong in
 `libs/shared-types/src`. Export them from `libs/shared-types/src/index.ts` and
-import them with `@expo-50sdk-template/shared-types` from either the API or
+import them with `@expo-58sdk-template/shared-types` from either the API or
 mobile app. Keep this library limited to platform-independent TypeScript types:
 it must not import React Native, Expo, Node runtime modules, or application
 implementation code.

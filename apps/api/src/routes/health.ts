@@ -1,4 +1,4 @@
-import type { HealthResponse } from '@expo-50sdk-template/shared-types';
+import type { HealthResponse } from '@expo-58sdk-template/shared-types';
 import type { Request, Response } from 'express';
 
 import type { ApiConfig } from '../config/env';

@@ -4,8 +4,8 @@ import net from 'net';
 import path from 'path';
 import { fileURLToPath, URL } from 'url';
 
-const containerName = 'expo-50sdk-template';
-const volumeName = 'expo-50sdk-template-data';
+const containerName = 'expo-58sdk-template';
+const volumeName = 'expo-58sdk-template-data';
 const imageName = 'mongo:latest';
 const defaultHostPort = 27017;
 const rootDir = path.resolve(

@@ -1,5 +1,5 @@
 {
-  "name": "@expo-50sdk-template/logging",
+  "name": "@expo-58sdk-template/logging",
   "version": "1.0.0",
   "private": true,
   "main": "./dist/index.js",

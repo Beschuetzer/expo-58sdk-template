@@ -34,7 +34,7 @@ This repository is a monorepo template for a mobile app and API, using a deploye
 
 5. Keep cross-app contracts typed and shared.
    - Add or update shared request/response interfaces in `libs/shared-types/src`.
-   - Import them via `@expo-50sdk-template/shared-types` rather than duplicating interfaces in each app.
+   - Import them via `@expo-58sdk-template/shared-types` rather than duplicating interfaces in each app.
    - Shared types should remain framework-agnostic and not import React Native, Express, or app-specific runtime code.
 
 6. Prefer minimal, targeted edits.

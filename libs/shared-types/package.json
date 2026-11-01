@@ -1,5 +1,5 @@
 {
-  "name": "@expo-50sdk-template/shared-types",
+  "name": "@expo-58sdk-template/shared-types",
   "private": true,
   "types": "src/index.ts"
 }

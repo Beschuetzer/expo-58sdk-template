@@ -1,6 +1,6 @@
 import { execFileSync } from 'child_process';
 
-const containerName = 'expo-50sdk-template';
+const containerName = 'expo-58sdk-template';
 
 try {
   execFileSync('podman', ['stop', containerName], {

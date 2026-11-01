@@ -3,7 +3,7 @@ import {
   parseLogLevel,
   type LogFields,
   type Logger,
-} from '@expo-50sdk-template/logging';
+} from '@expo-58sdk-template/logging';
 
 let logger: Logger | undefined;
 

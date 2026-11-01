@@ -31,7 +31,7 @@ const sharedTypesReferenceFiles = [
   path.join(root, 'apps', 'mobile', 'tsconfig.json'),
   path.join(root, 'README.md'),
 ];
-const templateSharedTypesName = '@expo-50sdk-template/shared-types';
+const templateSharedTypesName = '@expo-58sdk-template/shared-types';
 const EAS_PROJECT_ID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -152,19 +152,19 @@ function updatePackageNames(packageName, sharedTypesName) {
     lockfile.packages[''].name = packageName;
 
     const oldSharedTypesEntry =
-      lockfile.packages['node_modules/@expo-50sdk-template/shared-types'];
+      lockfile.packages['node_modules/@expo-58sdk-template/shared-types'];
     if (oldSharedTypesEntry) {
       delete lockfile.packages[
-        'node_modules/@expo-50sdk-template/shared-types'
+        'node_modules/@expo-58sdk-template/shared-types'
       ];
       lockfile.packages[`node_modules/${sharedTypesName}`] =
         oldSharedTypesEntry;
     }
 
-    if (lockfile.dependencies?.['@expo-50sdk-template/shared-types']) {
+    if (lockfile.dependencies?.['@expo-58sdk-template/shared-types']) {
       lockfile.dependencies[sharedTypesName] =
-        lockfile.dependencies['@expo-50sdk-template/shared-types'];
-      delete lockfile.dependencies['@expo-50sdk-template/shared-types'];
+        lockfile.dependencies['@expo-58sdk-template/shared-types'];
+      delete lockfile.dependencies['@expo-58sdk-template/shared-types'];
     }
   });
 
@@ -225,7 +225,7 @@ async function main() {
   const rl = readline.createInterface({ input, output });
   try {
     const defaultName =
-      path.basename(root) === 'expo-50sdk-template'
+      path.basename(root) === 'expo-58sdk-template'
         ? 'My Expo App'
         : path.basename(root);
     const displayName = await ask(rl, 'Display name', defaultName);
