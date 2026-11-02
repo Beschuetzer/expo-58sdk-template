@@ -25,6 +25,14 @@
       "favicon": "./assets/images/favicon.png"
     },
     "plugins": [
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "cmakeVersion": "4.1.2"
+          }
+        }
+      ],
       "expo-router",
       [
         "expo-splash-screen",
