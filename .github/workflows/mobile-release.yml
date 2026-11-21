@@ -1,6 +1,16 @@
 name: Mobile release
 
 on:
+  workflow_call:
+    inputs:
+      platform:
+        description: Platform to build
+        required: false
+        default: android
+        type: string
+    secrets:
+      EXPO_TOKEN:
+        required: true
   workflow_dispatch:
     inputs:
       platform:
@@ -34,7 +44,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 26
+          node-version: 22.13.0
           cache: npm
 
       - name: Install dependencies
@@ -45,4 +55,4 @@ jobs:
 
       - name: Build with EAS
         working-directory: apps/mobile
-        run: npx --yes eas-cli@latest build --platform "${{ inputs.platform }}" --profile production --non-interactive
+        run: npx --yes eas-cli@latest build --platform "${{ inputs.platform }}" --profile production --non-interactive --auto-submit

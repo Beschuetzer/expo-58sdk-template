@@ -1,0 +1,54 @@
+name: Deploy all
+
+on:
+  workflow_dispatch:
+    inputs:
+      platform:
+        description: Platform to build
+        required: true
+        default: android
+        type: choice
+        options:
+          - android
+          - ios
+          - all
+
+permissions:
+  contents: read
+
+jobs:
+  update-prisma-schema:
+    name: Update production Prisma schema
+    uses: ./.github/workflows/prisma-production.yml
+    secrets:
+      PRODUCTION_DATABASE_URL: ${{ secrets.PRODUCTION_DATABASE_URL }}
+
+      
+  release-mobile:
+    name: Release mobile app
+    needs: update-prisma-schema
+    uses: ./.github/workflows/mobile-release.yml
+    with:
+      platform: ${{ inputs.platform }}
+    secrets:
+      EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+
+  release-api:
+    name: Release API to Heroku
+    needs: [update-prisma-schema, release-mobile]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install Heroku CLI
+        run: curl -fsSL https://cli-assets.heroku.com/install.sh | sh
+
+      - name: Deploy to Heroku
+        env:
+          HEROKU_API_KEY: ${{ secrets.HEROKU_API_KEY }}
+        run: |
+          heroku git:remote --app relationship-api
+          git push heroku HEAD:main

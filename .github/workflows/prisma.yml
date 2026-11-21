@@ -1,0 +1,34 @@
+name: Prisma checks
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'apps/api/prisma/schema.prisma'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: prisma-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    env:
+      # Placeholder: validate/generate need the variable defined but never connect.
+      DATABASE_URL: mongodb://localhost:27017/ci
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.13.0
+          cache: npm
+
+      - run: npm ci
+      - run: npx prisma validate --schema=apps/api/prisma/schema.prisma
+      - run: npx prisma generate --schema=apps/api/prisma/schema.prisma
+      - run: npx jest --config package.json --runInBand --watchAll=false --forceExit apps/mobile

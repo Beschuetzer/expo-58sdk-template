@@ -1,0 +1,40 @@
+name: Prisma staging schema
+
+on:
+  workflow_run:
+    workflows: [Prisma checks]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: prisma-staging
+  cancel-in-progress: false
+
+jobs:
+  push-schema:
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        if: github.event_name == 'workflow_dispatch'
+
+      - uses: actions/checkout@v4
+        if: github.event_name == 'workflow_run'
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.13.0
+          cache: npm
+
+      - run: npm ci
+      - run: npx prisma db push --schema=apps/api/prisma/schema.prisma --skip-generate
+        env:
+          DATABASE_URL: ${{ secrets.STAGING_DATABASE_URL }}

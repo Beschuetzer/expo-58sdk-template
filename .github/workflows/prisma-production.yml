@@ -1,0 +1,31 @@
+name: Prisma production schema
+
+on:
+  workflow_call:
+    secrets:
+      PRODUCTION_DATABASE_URL:
+        required: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: prisma-production
+  cancel-in-progress: false
+
+jobs:
+  push-schema:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.13.0
+          cache: npm
+
+      - run: npm ci
+      - run: npx prisma db push --schema=apps/api/prisma/schema.prisma --skip-generate
+        env:
+          DATABASE_URL: ${{ secrets.PRODUCTION_DATABASE_URL }}
