@@ -1,0 +1,58 @@
+export enum Routes {
+  AccountTab = '(account)',
+}
+
+export const AppRoutePaths = {
+  home: '/(tabs)/(home)',
+  createRelationship: '/(tabs)/(home)/CreateRelationshipScreen',
+  relationshipDetails: '/(tabs)/(home)/relationship/[id]',
+  relationshipJoinRequestDetails:
+    '/(tabs)/(home)/relationship-join-request/[id]',
+  searchRelationships: '/search-relationships',
+  money: '/(tabs)/(requests)',
+  budgets: '/(tabs)/(requests)/BudgetsScreen',
+  createBudget: '/(tabs)/(requests)/NewBudgetScreen',
+  budgetDetails: '/(tabs)/(requests)/budget/[id]',
+  viewAllRequests: '/(tabs)/(requests)/ViewAllRequestsScreen',
+  createRequest: '/(tabs)/(requests)/NewPaymentRequestScreen',
+  awaitingDecision: '/(tabs)/(requests)/AwaitingDecisionScreen',
+  viewJointAccountCharges: '/(tabs)/(requests)/JointAccountChargesScreen',
+  createJointAccountCharge: '/(tabs)/(requests)/NewJointAccountChargeScreen',
+  paymentRequestDetails: '/(tabs)/(requests)/payment-request/[id]',
+  jointAccountChargeDetails: '/(tabs)/(requests)/joint-account-charge/[id]',
+  rules: '/(tabs)/(rules)',
+  viewAllRules: '/(tabs)/(rules)/ViewAllRulesScreen',
+  createRule: '/(tabs)/(rules)/NewRelationshipRuleScreen',
+  editRule: '/(tabs)/(rules)/EditRelationshipRuleScreen',
+  relationshipRuleDetails: '/(tabs)/(rules)/relationship-rule/[id]',
+  time: '/(tabs)/(time)',
+  viewAllMeTime: '/(tabs)/(time)/ViewAllMeTimeScreen',
+  createMeTime: '/(tabs)/(time)/NewMeTimeScreen',
+  editMeTime: '/(tabs)/(time)/EditMeTimeScreen',
+  meTimeDetails: '/(tabs)/(time)/MeTimeDetailsScreen',
+  viewAllIncompleteTasks: '/(tabs)/(time)/ViewAllIncompleteTasksScreen',
+  viewAllCompletedTasks: '/(tabs)/(time)/ViewAllCompletedTasksScreen',
+  taskDetails: '/(tabs)/(time)/RelationshipTaskDetailsScreen',
+  createTask: '/(tabs)/(time)/NewTaskScreen',
+  editTask: '/(tabs)/(time)/EditTaskScreen',
+  sex: '/(tabs)/(sex)',
+  loveMakingSessions: '/(tabs)/(sex)/LoveMakingSessionsScreen',
+  dateNights: '/(tabs)/(sex)/DateNightScreen',
+  account: '/(tabs)/(account)/AccountScreen',
+  notifications: '/(tabs)/(account)/notifications',
+  settings: '/(tabs)/(account)/SettingsScreen',
+} as const;
+
+export const DetailNavigationSources = {
+  relationships: 'homeRelationships',
+  relationshipJoinRequests: (relationshipId: string) =>
+    `relationshipJoinRequests:${relationshipId}`,
+  budgets: 'budgets',
+  paymentRequests: 'paymentRequests',
+  awaitingDecision: 'awaitingDecision',
+  jointAccountCharges: 'jointAccountCharges',
+  relationshipRules: 'relationshipRules',
+  meTime: 'meTime',
+  incompleteTasks: 'incompleteTasks',
+  completedTasks: 'completedTasks',
+} as const;

@@ -4,8 +4,10 @@
 node_modules/
 .pnp.*
 
-# Nx
-.nx/
+# .NET and Aspire
+**/bin/
+**/obj/
+.aspire/
 dist/
 tmp/
 out-tsc/
@@ -59,4 +61,6 @@ coverage/
 .eslintcache
 .prettiercache
 .vscode/*.log
+.nx/
 .mongodb-port
+.vs

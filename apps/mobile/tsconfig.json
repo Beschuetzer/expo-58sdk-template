@@ -2,12 +2,19 @@
   "extends": "expo/tsconfig.base",
   "compilerOptions": {
     "strict": true,
+    "types": [
+      "jest",
+      "node"
+    ],
     "paths": {
       "@/*": [
-        "./src/*"
+        "./*"
       ],
-      "@/assets/*": [
-        "./assets/*"
+      "@expo-50sdk-template/shared-types": [
+        "../../libs/shared-types/src/index.ts"
+      ],
+      "@expo-50sdk-template/logging": [
+        "../../libs/logging/src/index.ts"
       ]
     }
   },
@@ -15,6 +22,7 @@
     "**/*.ts",
     "**/*.tsx",
     ".expo/types/**/*.ts",
-    "expo-env.d.ts"
+    "expo-env.d.ts",
+    "nativewind-env.d.ts"
   ]
 }

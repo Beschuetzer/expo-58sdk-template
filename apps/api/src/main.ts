@@ -1,18 +1,53 @@
 import { loadConfig } from './config/env';
-import { connectPrisma } from './lib/prisma';
-import { logError, logInfo } from './logging';
+import { PrismaBudgetService } from './features/budgets/service';
+import { PrismaRelationshipRuleService } from './features/relationshipRules/service';
+import { PrismaTimeService } from './features/time/service';
+import prisma, { connectPrisma } from './lib/prisma';
+import { logError, logInfo, shutdownApiLogging } from './logging';
 import { createApiServer, startApiServer, stopApiServer } from './server';
 
-if (!process.env.AUTH_AUDIENCE || !process.env.AUTH_ISSUER_BASE_URL) {
-  throw new Error('AUTH_AUDIENCE and AUTH_ISSUER_BASE_URL must be set');
-}
-const config = loadConfig(process.env);
+const config = loadConfig();
 const server = startApiServer(createApiServer(config), config);
-void connectPrisma(config.databaseUrl);
+connectPrisma(config.databaseUrl).catch((error: unknown) => {
+  logError('database_connection_unexpected_failure', { error });
+});
+const budgetService = new PrismaBudgetService(prisma);
+const budgetRolloverTimer = setInterval(() => {
+  budgetService.rolloverExpiredBudgets().catch((error: unknown) => {
+    logError('budget_rollover_failed', { error });
+  });
+}, 60_000);
+budgetService.rolloverExpiredBudgets().catch((error: unknown) => {
+  logError('budget_rollover_failed', { error });
+});
+const relationshipRuleService = new PrismaRelationshipRuleService(prisma);
+const reminderTimer = setInterval(() => {
+  relationshipRuleService
+    .deliverDueReviewReminders()
+    .catch((error: unknown) => {
+      logError('relationship_rule_reminders_failed', { error });
+    });
+}, 60_000);
+relationshipRuleService.deliverDueReviewReminders().catch((error: unknown) => {
+  logError('relationship_rule_reminders_failed', { error });
+});
+const timeService = new PrismaTimeService(prisma);
+const taskReminderTimer = setInterval(() => {
+  timeService.deliverDueTaskReminders().catch((error: unknown) => {
+    logError('relationship_task_reminders_failed', { error });
+  });
+}, 60_000);
+timeService.deliverDueTaskReminders().catch((error: unknown) => {
+  logError('relationship_task_reminders_failed', { error });
+});
 
 function shutdown(signal: string) {
   logInfo('api_shutdown_started', { signal });
+  clearInterval(budgetRolloverTimer);
+  clearInterval(reminderTimer);
+  clearInterval(taskReminderTimer);
   stopApiServer(server)
+    .then(() => shutdownApiLogging())
     .then(() => process.exit(0))
     .catch((error: unknown) => {
       logError('api_shutdown_failed', { error });

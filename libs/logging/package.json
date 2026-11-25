@@ -1,8 +1,19 @@
 {
-  "name": "@expo-58sdk-template/logging",
+  "name": "@expo-50sdk-template/logging",
   "version": "1.0.0",
   "private": true,
-  "main": "./dist/index.js",
+  "main": "../../../dist/libs/logging/index.js",
   "react-native": "src/index.ts",
-  "types": "./dist/index.d.ts"
+  "types": "src/index.ts",
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "tsx --test src/index.spec.ts src/otel.spec.ts"
+  },
+  "dependencies": {
+    "@opentelemetry/api": "^1.10.0",
+    "@opentelemetry/exporter-logs-otlp-http": "^0.301.2",
+    "@opentelemetry/resources": "^3.1.1",
+    "@opentelemetry/sdk-logs": "^3.1.1"
+  }
 }

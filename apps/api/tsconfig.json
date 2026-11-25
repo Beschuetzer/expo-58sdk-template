@@ -6,15 +6,19 @@
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
     "types": ["node"],
-    "baseUrl": ".",
     "paths": {
-      "@expo-58sdk-template/shared-types": [
+      "@expo-50sdk-template/shared-types": [
         "../../libs/shared-types/src/index.ts"
       ],
-      "@expo-58sdk-template/logging": [
+      "@expo-50sdk-template/logging": [
         "../../libs/logging/src/index.ts"
       ]
     }
   },
-  "include": ["src/**/*.ts", "../../libs/shared-types/src/**/*.ts"]
+  "include": [
+    "src/**/*.ts",
+    "prisma/seed-featured-users.ts",
+    "prisma/seed-featured-users.spec.ts",
+    "../../libs/shared-types/src/**/*.ts"
+  ]
 }

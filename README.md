@@ -1,6 +1,8 @@
-## Expo SDK 58 Nx Starter Monorepo
+## Expo 58 Aspire Starter Monorepo
 
-A neutral Expo SDK 58 starter shell managed by Nx, with a minimal Node.js backend and an external beta OIDC provider.
+A neutral Expo SDK 58 starter shell orchestrated by a C# Aspire 17 AppHost, with a minimal Node.js backend and hosted OAuth2/OIDC identity provider.
+
+The workspace requires Node.js `>=22.13.0 <23` and npm `>=10`.
 
 ## AI / LLM onboarding
 
@@ -9,7 +11,7 @@ This repository is intentionally structured for AI-assisted development and exte
 - The mobile app must remain internationalized. All visible user text goes through the translation map in `apps/mobile/utils/i18n.tsx`.
 - The mobile app supports system, light, and dark themes. New UI should be theme-aware and should not assume a single fixed color scheme.
 - Shared contracts live in `libs/shared-types/src` and should be reused across apps instead of duplicated.
-- The API and mobile app remain separate from the externally managed identity provider.
+- The API and mobile app each have separate responsibilities and should stay decoupled from the hosted identity provider.
 
 For detailed repo instructions, see [AGENTS.md](AGENTS.md).
 
@@ -18,23 +20,20 @@ For detailed repo instructions, see [AGENTS.md](AGENTS.md).
 - `mobile`: Expo Router app in `apps/mobile`, using Expo SDK 58 and gluestack UI v1.
 - `api`: Express-based OAuth2 resource server in `apps/api`.
 - `shared-types`: source-only TypeScript contracts in `libs/shared-types`, consumed by both apps.
+- `logging`: cross-platform structured logger in `libs/logging`, consumed by both apps.
 
 The API currently exposes public `GET /health` and protected `GET /api/v1/me`
-on port `4200` by default.
+on port `4200`.
 
-The API validates tokens from the configured beta identity provider using its
-OIDC discovery and JWKS metadata. Set the issuer once in `apps/api/.env`; mobile
-startup and the initializer reuse that value.
+The local hosted identity-provider settings are configured centrally in
+`AppHost/Program.cs` and supplied to both API and Expo. The provider publishes
+discovery and JWKS metadata and handles Google authentication upstream without
+exposing provider secrets to the mobile app.
 
-### Security posture
-
-Identity management is provided externally; this workspace does not contain
-an identity server or store user credentials.
-
-Run `npm run dev` to start the mobile app and API. The home screen's
-authenticated-endpoint button uses PKCE with the beta identity provider, stores
-the resulting access token in native SecureStore, and calls `GET /api/v1/me`
-with the Bearer token.
+Run `npm run dev` to start the mobile app and API against the hosted issuer. The
+login tab opens the provider's PKCE sign-in flow on first use, stores the
+resulting access token in native SecureStore, and the API validates the Bearer
+token with `GET /api/v1/me`.
 
 Native access tokens are refreshed with rotating refresh tokens stored in
 SecureStore. Web builds keep both tokens behind HttpOnly cookies managed by the
@@ -45,16 +44,42 @@ clears the session and requires a new PKCE sign-in.
 
 Cross-application request and response contracts belong in
 `libs/shared-types/src`. Export them from `libs/shared-types/src/index.ts` and
-import them with `@expo-58sdk-template/shared-types` from either the API or
+import them with `@expo-50sdk-template/shared-types` from either the API or
 mobile app. Keep this library limited to platform-independent TypeScript types:
 it must not import React Native, Expo, Node runtime modules, or application
 implementation code.
 
-The development typechecks resolve the library source directly. Production API
-builds first emit declaration files for the library and then consume those
-declarations through the Nx project dependency. Add a new contract under a
-focused folder such as `src/lib/api`, export it from the library entry point,
-and run `npx nx run shared-types:typecheck` plus the affected app typechecks.
+Development typechecks resolve library source directly. Production API builds
+compile the shared libraries before the API so their declaration files are
+available. Add a new contract under a focused folder such as `src/lib/api`,
+export it from the library entry point, then run `npm run typecheck`.
+
+## Logging
+
+Mobile and API logs use the reusable structured logger in `libs/logging`.
+`LOG_LEVEL` controls the API, while Expo uses `EXPO_PUBLIC_LOG_LEVEL` because
+only `EXPO_PUBLIC_*` variables are available in the mobile bundle. Supported
+levels are `debug`, `info`, `warn`, `error`, and `silent`; the selected level
+is the minimum severity emitted (for example, `warn` emits warnings and
+errors). The API defaults to `debug` in development and `info` in production.
+Mobile defaults to `debug` in development and `warn` in production. The
+AppHost supplies both local log levels from `AppHost/Program.cs`. Production
+API and EAS builds use their deployment configuration. Mobile public
+environment values are included in the client bundle, so never put credentials
+or other secrets in them. The logger emits structured JSON and redacts common
+credential and personal-data fields. Application logs should still avoid
+including request bodies, tokens, claims, or raw user identifiers.
+
+For local development, Aspire starts Grafana with the OpenTelemetry LGTM
+backend at `http://localhost:3000` (login: `admin` / `admin`). The API exports
+structured logs over OTLP/HTTP only in development, and exposes an
+authenticated mobile-log endpoint only in that environment. The mobile app
+queues logs in memory and relays batches through it, and the API forwards both
+API and mobile logs to the local OTLP receiver. This keeps the unauthenticated
+collector bound to the local development environment instead of exposing it to
+the LAN. Configure `OTEL_EXPORTER_OTLP_LOGS_ENDPOINT` to override the API's
+development receiver URL. The mobile relay is enabled in development, and
+queued logs are sent after authentication is available.
 
 ## Mobile Architecture
 
@@ -87,30 +112,27 @@ the root layout. Redux Persist uses the same storage mechanism for client
 state, but the two persisted stores remain separate and independently
 versioned.
 
-The starter home screen includes cache verification controls. Press `Test
-Backend Connection` to fetch and cache the health response, `Read Cached
-Health` to inspect that response without a network request, and `Clear Backend
-Cache` to remove it. Reading the cache after clearing should report a cache
-miss.
+The home screen is the relationship-space entry point. Authenticated users can
+create a space, select an existing space, open shared requests, and create an
+invitation link for another member. Invitation recipients authenticate through
+the normal PKCE flow before they can preview or accept an invitation.
 
 Redux DevTools are enabled in development through
-`redux-devtools-expo-dev-plugin@2.0.0`, compatible with this Expo SDK 58
-template. After starting the mobile app, press `Shift+M` in the
+`redux-devtools-expo-dev-plugin@2.0.0`, which supports Expo SDK 58. After starting the mobile app, press `Shift+M` in the
 Expo CLI and choose `Open devtools plugin - redux-devtools-expo-dev-plugin`.
 The enhancer is disabled in production builds.
 
 ### Lists
 
-`@shopify/flash-list` v2 is installed and used by the home screen. Use it for
-data-driven lists and provide a stable `keyExtractor`; v2 measures item sizes
-automatically. Prefer the shared theme-aware primitives for list rows so light
-and dark mode behavior stays consistent across screens.
+`@shopify/flash-list` is already installed for data-driven screens. Use it
+for data-driven lists, provide a stable `keyExtractor`, and set an
+`estimatedItemSize`. Prefer the shared theme-aware primitives for list rows so
+light and dark mode behavior stays consistent across screens.
 
 ## Local Development
 
-Expo SDK 58 requires Node.js `^22.13.0 || ^24.3.0 || ^26.0.0 || >=27.0.0`.
-
-Install dependencies once:
+Install dependencies once. Starting the local stack also requires the .NET 10
+SDK and a Docker-compatible container runtime:
 
 ```bash
 npm install
@@ -123,96 +145,93 @@ npm run init
 ```
 
 The initializer assigns the Expo name, slug, deep-link scheme, iOS bundle ID,
-Android package, EAS project ID, and API/OIDC URLs. It creates the API
-environment file if missing and updates its OIDC issuer and audience. The
-audience is derived as `<issuer>/resources/api` and written to API configuration,
-the local mobile environment on startup, and preview/production EAS profiles.
-Database credentials, OAuth client configuration, EAS authentication, and
-other production secrets must still be supplied separately.
+Android package, and production API/OIDC URLs. If no valid EAS project ID is
+configured, it runs EAS CLI to create or link a project and writes the UUID to
+the app config; sign in to Expo or choose an account when prompted. It creates
+no local API environment file. Local API, OAuth, and Expo settings are defined
+in `AppHost/Program.cs`; production credentials and other secrets must still
+be supplied through deployment configuration.
 
-Start Expo and the backend together:
+Start the API, Expo, and MongoDB together:
 
 ```bash
 npm run dev
 ```
 
-On Windows, this opens separate PowerShell windows for Expo and the API so each
-process keeps its own logs and interactive output. Close either window to stop
-that process. On other platforms, both commands run in the current terminal.
-To change the local API port, set `PORT` in `apps/api/.env`; `npm run dev`
-passes that port to the API and uses it for the mobile app's API URL as well.
+This runs the C# Aspire 17 AppHost in `AppHost/`. Aspire starts a MongoDB
+single-member replica set with a persistent data volume, then starts the API
+and mobile app. The Aspire dashboard provides each resource's logs and an
+interactive terminal for the Expo process.
 
-Start either project independently:
+The development seed is opt-in. On PowerShell, enable it before starting the
+stack when you want the sample `a100`-`a199` relationships and owner records:
 
-```bash
-npm run api
-npm run mobile
+```powershell
+$env:SEED_DEVELOPMENT_DATA = "true"
+$env:SEED_DEVELOPMENT_USER_ID = "<authenticated-user-sub>"
+npm run dev
 ```
 
-The normal mobile command runs Expo directly via `npm --prefix apps/mobile`
-instead of Nx, so Expo Go's QR code and interactive keyboard shortcuts (`a`,
-`w`, `r`, `?`, etc.) work reliably on Windows terminals. To force a clean Metro
-rebuild when troubleshooting, run:
+`SEED_DEVELOPMENT_USER_ID` must be the logged-in user's JWT `sub` claim. The
+seed is idempotent and runs only with `NODE_ENV=development`; it refuses to run
+in production. Omit the seed flag or set it to `false` to start without
+seeding.
 
-```bash
-npm --prefix apps/mobile run dev:clear
-```
+The opt-in seed keeps the existing `a100`-`a199` import data and additionally
+creates a shared relationship plus one personal relationship for each of the
+two featured demo users. The shared relationship includes payment requests in
+all five states, plus 80 additional pending requests from each featured user
+for the other to review. This gives Testy 91 and Shifty 81 requests awaiting a
+decision, with varied titles, categories, purchase dates, and amounts for
+testing search, filters, sorting, and pagination. It also includes 32
+joint-account charges across paid and unpaid statuses and both creators, with
+varied names, amounts, and dates for filtering and pagination. The Time feature
+includes 80 shared Me Time entries and 80 shared tasks, split between both
+users, plus 24 Me Time entries and tasks in each user's personal relationship.
+The Me Time entries span more than a year and vary in duration and description
+(including blank descriptions). Tasks include completed and incomplete records,
+created and completed by both users in the shared relationship. Each Time list
+has enough entries for pagination when either user selects the shared or
+personal relationship.
+The shared relationship also includes 15 budget periods across monthly,
+quarterly, and yearly ranges, with 15 approval records covering approved and
+pending budgets and 55 dated budget items. Four historical periods are marked
+renewed and have successor periods, so the API's startup rollover does not
+create duplicates. Budget creation and item-added notifications are seeded for
+both users.
+Each personal relationship also includes draft and approved payment-request
+examples. These fixtures use the users' IDs and display names only and do not
+create or modify identity-provider accounts or credentials.
 
-### Mobile Networking and OAuth
+The seed runs as an Aspire one-time resource and completes before the API
+starts. Aspire supplies the local database connection string to both processes.
+The MongoDB data volume is named `relationship-app-mongodb-data`; remove that
+volume with your container runtime when you want a clean database.
 
-The mobile app calls the API directly. `EXPO_PUBLIC_API_URL`, when set, is the
-base URL used by the app for API requests. Otherwise, development uses
-`http://EXPO_PUBLIC_IP_ADDRESS:EXPO_PUBLIC_PORT_NUMBER` (port `4200` by
-default). `EXPO_PUBLIC_IP_ADDRESS` is the computer hosting the API, not the
-phone's address:
+The AppHost exposes an interactive terminal for Expo, so its QR code and
+keyboard shortcuts (`a`, `w`, `r`, `?`, etc.) remain available.
 
-- Web on the host computer and usually the iOS simulator can use
-    `localhost` or `127.0.0.1`.
-- The Android emulator uses `10.0.2.2` to reach the host computer.
-- A physical device needs the host computer's reachable LAN address, such as
-    `192.168.4.39`.
+The mobile app's `Test Backend Connection` button calls the API health endpoint.
+`AppHost/Program.cs` supplies API and OAuth settings to both resources.
+AppHost detects a usable LAN IPv4 address and injects the API URL directly into
+Expo, so no generated `.env` file or separate mobile setup script is needed.
+To override the detected address (for example, when using a custom network),
+set `EXPO_PUBLIC_API_URL` in the AppHost configuration.
 
-Before Metro starts, `apps/mobile/setup.mjs` detects a non-loopback IPv4 address
-and rewrites `EXPO_PUBLIC_IP_ADDRESS` and `EXPO_PUBLIC_PORT_NUMBER` in
-`apps/mobile/.env`. The port comes from `PORT` in `apps/api/.env` (default
-`4200`), keeping the mobile app and API in sync. Therefore, manually editing the
-IP is not persistent. To use a fixed address, set `EXPO_PUBLIC_API_URL` instead.
-Production and preview builds should use the deployed API URL; the production
-fallback is only a placeholder.
+The checked-in EAS `preview` and `production` profiles both provide
+`EXPO_PUBLIC_API_URL` and `EXPO_PUBLIC_IDP_URL`. Custom EAS profiles and other
+production builds must provide both values; the mobile config fails early if
+either is missing rather than relying on a hard-coded service URL.
 
-The mobile client initiates OAuth: it discovers the identity provider and
-starts the PKCE authorization request. Native clients exchange the code with
-the identity provider directly. On web, the API BFF exchanges the code and
-refreshes tokens in HttpOnly cookies. The mobile app still needs
-`EXPO_PUBLIC_IDP_URL` to discover the provider. For local development,
-`apps/mobile/setup.mjs` copies `AUTH_ISSUER_BASE_URL` from `apps/api/.env` into
-the mobile environment.
-
-`EXPO_PUBLIC_OAUTH_CLIENT_ID` is required by the mobile auth flow and must match
-the API's `AUTH_CLIENT_ID`. `npm run dev` passes this value from
-`apps/api/.env` to both the API and Expo. If starting the mobile app by itself
-with `npm run mobile`, make sure `EXPO_PUBLIC_OAUTH_CLIENT_ID` is also available
-to Expo with that same value.
-
-`EXPO_PUBLIC_OAUTH_AUDIENCE` defaults to
-`${EXPO_PUBLIC_IDP_URL}/resources/api`, and the OAuth scopes have a built-in
-default; set either explicitly only when the identity provider configuration
-differs. `EXPO_PUBLIC_OAUTH_SCHEME` defaults to `expo50sdktemplate`, matching
-the current `scheme` in `apps/mobile/app.json`. If you change the app's deep
-link scheme, keep this variable and the `app.json` scheme identical. The scheme
-is used for native OAuth callbacks and invitation links. Logout returns to the
-separate `/oauth/logout` route, which navigates to Account instead of waiting on
-the sign-in callback. Register the resulting logout redirect URI with the
-identity provider: for the default native scheme it is
-`expo50sdktemplate://oauth/logout`. If setting
-`EXPO_PUBLIC_OAUTH_POST_LOGOUT_REDIRECT_URI`, point it to a registered logout
-destination rather than `/oauth/callback`.
-
-The mobile template includes a typed i18n provider with English and Spanish
-starter translations. The device locale selects the initial language, and the
-language selector in the Settings tab persists the user's choice with
-AsyncStorage. Add new messages in `apps/mobile/utils/i18n.tsx` and reference
-them with `useI18n().t('section.key')` instead of hard-coding user-facing text.
+The mobile app includes a typed i18n provider with English, Spanish, and German
+translations. The device locale selects the initial language, and the language
+selector in the Settings tab persists the user's choice with AsyncStorage. Add
+new messages for all supported languages in `apps/mobile/utils/i18n.tsx` and
+reference them with `useI18n().t('section.key')` instead of hard-coding
+user-facing text. Android's native date and time picker uses the Android system
+or per-app language for its calendar contents. Notification titles and bodies
+generated by the API are displayed as received and are not translated by the
+mobile i18n provider.
 
 Theme support is provided by `apps/mobile/utils/theme.tsx`. The Settings tab
 allows users to choose System, Light, or Dark mode, and the choice is persisted
@@ -221,94 +240,144 @@ the tab bar, and legacy themed components. Use `useColorScheme()` or
 `useThemeMode()` for theme-aware behavior, and avoid fixed light-only colors in
 new screens.
 
+The Settings tab also provides five screen background choices: None, a
+theme-aware solid color, or a subtle Default, Futuristic, or Classic wallpaper.
+The selected background and color persist with AsyncStorage and apply to screens
+that use `ThemeAwareScreen`.
+
+Tile gradients can be customized by angle, color stops, stop positions, and
+opacity. These preferences are stored locally through Redux Persist.
+
 ### Mobile releases
 
 Pull requests run check-only ESLint plus `expo config` and `expo-doctor`.
 Production mobile builds are started manually from the GitHub Actions `Mobile
 release` workflow. Configure the real EAS project ID in `apps/mobile/app.json`
 and add an `EXPO_TOKEN` repository secret before starting a build; the workflow
-offers Android, iOS, and combined production builds.
+offers Android, iOS, and combined production builds. To start both platform
+builds from the repository root, run `npm run build:production`; it uses the
+`production` profile in `apps/mobile/eas.json`.
 
-EAS cloud builds do not read local `.env` files. The build profiles in
-`apps/mobile/eas.json` select the matching EAS environments: `development`,
-`preview`, and `production`. Configure the following values for the environment
-selected by the build profile:
+### Push notifications
 
-- `EXPO_PUBLIC_OAUTH_CLIENT_ID`: required; use the same value as
-    `AUTH_CLIENT_ID` in `apps/api/.env`. It is embedded in the mobile app, so it
-    is public configuration, not a secret.
-- `EXPO_PUBLIC_IDP_URL`: required for mobile OAuth discovery. `npm run init`
-    writes it into the preview and production profile environment; set it in the
-    EAS development environment for development builds.
-- `EXPO_PUBLIC_API_URL`: set this to the API URL reachable by the installed
-    app. `npm run init` writes it into the preview and production profiles. For
-    development builds, set it to a reachable development API if the app will
-    not use the local IP and port fallback.
-- `EXPO_PUBLIC_ENV`: preview and production profiles already set this to
-    `production`; development can use `development`.
-- `EXPO_PUBLIC_OAUTH_SCHEME`: only needed if it differs from the default and
-    `scheme` in `apps/mobile/app.json`.
+The app uses the SDK 58-compatible `expo-notifications`
+package. On iOS and Android, signing in prompts for notification permission and
+registers the Expo push token with the API. Notifications are sent for new
+relationship join requests and their decisions, submitted joint payment
+requests, payment-request decisions, and cancellations, budget creation and
+edits, and budget items. Draft payment requests do not notify other members
+until submitted for approval. Existing in-app notifications remain available
+when push permission is denied.
 
-`EXPO_PUBLIC_OAUTH_AUDIENCE` and `EXPO_PUBLIC_OAUTH_SCOPES` are optional when
-their defaults match the identity provider configuration. `EXPO_PUBLIC_IP_ADDRESS`
-and `EXPO_PUBLIC_PORT_NUMBER` are for local development; a build with
-`EXPO_PUBLIC_API_URL` does not need them.
+Push delivery uses the Expo Push Service. The app registers an Expo push token
+with the API; EAS stores the credentials Expo needs to forward notifications to
+FCM and APNs. These credentials are not device tokens and must not be embedded
+in the app, added to `eas.json`, or committed to the repository.
 
-Add `EXPO_PUBLIC_OAUTH_CLIENT_ID` as a plain-text variable in each EAS
-environment, using the value from `apps/api/.env`. For example, run these
-commands from `apps/mobile`, replacing `YOUR_AUTH_CLIENT_ID` with that value:
+The app is already linked to EAS by the `owner` and `extra.eas.projectId` in
+[`apps/mobile/app.json`](./apps/mobile/app.json). Use an Expo account with
+access to that project when managing credentials. Device tokens are associated
+with the authenticated account, and mobile sign-out attempts to unregister the
+device token.
 
-```bash
-npx --yes eas-cli@latest env:set --name EXPO_PUBLIC_OAUTH_CLIENT_ID --value "YOUR_AUTH_CLIENT_ID" --environment development --visibility plaintext
-npx --yes eas-cli@latest env:set --name EXPO_PUBLIC_OAUTH_CLIENT_ID --value "YOUR_AUTH_CLIENT_ID" --environment preview --visibility plaintext
-npx --yes eas-cli@latest env:set --name EXPO_PUBLIC_OAUTH_CLIENT_ID --value "YOUR_AUTH_CLIENT_ID" --environment production --visibility plaintext
+#### Enabling notifications for the preview profile
+
+The `preview` profile in [`apps/mobile/eas.json`](./apps/mobile/eas.json) uses
+internal distribution and points to the production API. The notifications
+plugin in [`apps/mobile/app.config.js`](./apps/mobile/app.config.js) selects the
+development APNs entitlement for this profile; `EXPO_PUBLIC_ENV=production`
+does not change that. This workspace has `preview` and `production` EAS build
+profiles; use `preview` for internal testing.
+
+**Android (FCM V1)**
+
+The app-side Firebase configuration is already present:
+[`apps/mobile/google-services.json`](./apps/mobile/google-services.json) and
+[`apps/mobile/GoogleService-Info.plist`](./apps/mobile/GoogleService-Info.plist)
+refer to the `relationship-app-notifications` Firebase project. The Android
+package name is `com.adammajor.relationshipapp`, as configured in
+[`apps/mobile/app.json`](./apps/mobile/app.json). These files contain public
+client configuration; they are not the private FCM sending credential.
+
+1. In Firebase Console, select the same Firebase project and open **Project
+   settings** > **Service accounts** > **Firebase Admin SDK**. Select
+   **Generate new private key** and securely save the downloaded JSON outside
+   the repository. If using an existing service account, grant it the
+   **Firebase Cloud Messaging API Admin** role.
+2. From `apps/mobile`, run:
+
+   ```powershell
+   npx --yes eas-cli@latest credentials
+   ```
+
+   Select **Android** > **production** > **Google Service Account** >
+   **Manage your Google Service Account Key for Push Notifications (FCM V1)**
+
+   > **Set up a Google Service Account Key for Push Notifications (FCM V1)** >
+   > **Upload a new service account key**, then select the JSON key file.
+
+3. Alternatively, in the linked project's EAS dashboard, open **Project
+   settings** > **Credentials** > **Android**. Add or select the application
+   identifier `com.adammajor.relationshipapp`, then under **Service
+   credentials** > **FCM V1 service account key**, choose **Add a service
+   account key** and upload the JSON file.
+
+Never commit the service-account JSON, put it in `eas.json`, or add it to
+`EXPO_PUBLIC_*` environment variables. It is a private server credential.
+
+See [Expo's FCM V1 setup guide](https://docs.expo.dev/push-notifications/fcm-credentials/)
+for screenshots and troubleshooting.
+
+**iOS (optional)**
+
+An Apple Developer Program membership is required. The bundle identifier is
+`com.adammajor.relationshipapp`. Register each iPhone used for internal
+distribution with EAS before building.
+
+The easiest setup is to let EAS create and store the APNs key during the first
+iOS preview build. From `apps/mobile`, run:
+
+```powershell
+npx --yes eas-cli@latest build --platform ios --profile preview
 ```
 
-The `preview` build uses the preview environment, and the release workflow's
-production build uses the production environment. If the client ID or issuer
-URL is missing, mobile authentication fails at startup. If the API URL is
-missing for a production build, API requests use the placeholder URL.
+When prompted, approve setting up push notifications and generating a new
+Apple Push Notifications service key. Alternatively, run
+`npx --yes eas-cli@latest credentials` from `apps/mobile` and use the iOS
+push-notification credential option to manage or upload a key. To create a key
+manually, use **Certificates, Identifiers & Profiles** > **Keys** in the Apple
+Developer portal, enable **Apple Push Notifications service (APNs)**, and keep
+the downloaded `.p8` file, Key ID, and Apple Team ID private. Upload the key to
+EAS; do not commit it or put it in app environment variables.
 
-## VS Code Debugging
+**Build and test**
 
-The repository includes checked-in launch profiles under `.vscode`. They run
-the API from TypeScript with source maps, so breakpoints can be set directly in
-`apps/api/src`.
+After changing native configuration or credentials, create a new build.
+`npm run build:preview` from the repository root builds the Android preview
+profile. The iOS command above builds the iOS preview profile. Install the
+build on a device, sign in, and grant notification permission. Trigger a
+join-request or payment-request event from another member's test account to
+verify delivery.
 
-1. Open the Run and Debug view.
-2. Choose `Debug API` to start the API.
-3. Set breakpoints in a route or authentication middleware and exercise the
-    API from the mobile app or an HTTP client.
-4. Run mobile app via `npm run mobile`
+The preview app registers its push token with the API URL configured in
+`eas.json`; deploy the notification-enabled API before testing against that
+profile. The preview profile points to the production API, so use accounts and
+data you control. No APNs or FCM private key belongs in the preview environment
+variables. See [Expo's push-notification setup guide](https://docs.expo.dev/push-notifications/push-notifications-setup/)
+for more detail.
 
-The API profile uses the beta identity issuer and `api` audience. It is intended
-for an emulator, web browser, or HTTP client running on the same machine.
-
-`Debug Expo web` starts the Expo web target and launches it in the VS Code
-JavaScript debugger. Use it when you want to place breakpoints in mobile
-screens, hooks, and API clients. For native Expo Go debugging, use Expo's
-development menu and browser debugger for the running device; the native
-runtime and the web runtime do not share identical platform behavior.
-
-The profile launches the API directly rather than through `npm run dev`, which
-opens detached Windows terminals and prevents VS Code from owning the Node
-debugger session.
-
-## Nx Commands
+## Workspace Commands
 
 ```bash
-npx nx show projects
-npx nx run shared-types:typecheck
-npx nx run mobile:typecheck
-npx nx run api:typecheck
-npx nx build api
 npm run typecheck
-npm run validate:startup
+npm run test:all
+npm run api:build
+npm run validate:mobile
 ```
 
 ## Mobile Testing
 
-The mobile Jest setup remains under `apps/mobile` and can be run through Nx:
+The mobile Jest setup remains under `apps/mobile`:
 
 ```bash
 npm test
@@ -323,15 +392,13 @@ statements, branches, functions, or lines coverage falls below 90%.
 
 ### API testing
 
-The API suite exercises real local HTTP servers and request/response flows.
-Test doubles are limited to explicit external boundaries, such as an
-unavailable database or an injected authentication adapter, so tests remain
-deterministic without contacting the beta identity provider.
+The API suite exercises real HTTP request/response flows. Test doubles are
+limited to explicit external boundaries, such as an unavailable database or
+an injected authentication adapter, so tests remain deterministic without
+mocking internal route or OAuth logic.
 
-## Production API Configuration
+## Development Configuration
 
-The local API defaults to `HOST=0.0.0.0` and `PORT=4200`. Override either value when serving the API directly:
-
-```powershell
-$env:PORT=4300; npm run api
-```
+The local API port, bind address, OAuth settings, CORS origin, and log levels
+are configured in `AppHost/Program.cs`. Use `npm run dev` to start or restart
+the complete local environment through Aspire.

@@ -40,7 +40,7 @@ jobs:
         run: npx prisma generate --schema=apps/api/prisma/schema.prisma
 
       - name: Run API tests
-        run: npx nx run api:test --outputStyle=static
+        run: npm run test --workspace=api
 
       - name: Run mobile tests with coverage
         run: npm run test:coverage
@@ -85,7 +85,7 @@ jobs:
           if-no-files-found: error
 
       - name: Run typechecks
-        run: npm run typecheck -- --outputStyle=static
+        run: npm run typecheck
 
       - name: Build Node services
-        run: npm run build -- --outputStyle=static
+        run: npm run build

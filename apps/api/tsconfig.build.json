@@ -3,11 +3,11 @@
   "compilerOptions": {
     "rootDir": "./src",
     "paths": {
-      "@expo-58sdk-template/shared-types": [
+      "@expo-50sdk-template/shared-types": [
         "../../dist/libs/shared-types/index.d.ts"
       ],
-      "@expo-58sdk-template/logging": [
-        "../../libs/logging/dist/index.d.ts"
+      "@expo-50sdk-template/logging": [
+        "../../dist/libs/logging/index.d.ts"
       ]
     }
   },

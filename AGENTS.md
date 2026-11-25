@@ -1,11 +1,12 @@
 # AGENTS.md
 
-This repository is a monorepo template for a mobile app and API, using a deployed external OIDC identity provider.
+This repository is a monorepo template for a mobile app and an API backed by a hosted identity provider.
 
 ## Purpose of the repo
 
-- `apps/mobile`: Expo SDK 58 React Native 0.88 application using Expo Router, Redux Toolkit, Redux Persist, TanStack Query, and Gluestack UI v1.
+- `apps/mobile`: Expo SDK 58 React Native application using React Native 0.88, Expo Router, Redux Toolkit, Redux Persist, TanStack Query, Gluestack UI v5, and NativeWind v4.
 - `apps/api`: Express OAuth2 resource server with TypeScript, Prisma-ready MongoDB configuration, and lightweight health/auth endpoints.
+- Hosted OAuth2/OIDC identity provider: issues tokens for mobile PKCE flows and is configured through environment variables.
 - `libs/shared-types`: platform-neutral TypeScript contracts that are shared across apps.
 
 ## Core rules for AI-assisted changes
@@ -34,7 +35,7 @@ This repository is a monorepo template for a mobile app and API, using a deploye
 
 5. Keep cross-app contracts typed and shared.
    - Add or update shared request/response interfaces in `libs/shared-types/src`.
-   - Import them via `@expo-58sdk-template/shared-types` rather than duplicating interfaces in each app.
+   - Import them via `@expo-50sdk-template/shared-types` rather than duplicating interfaces in each app.
    - Shared types should remain framework-agnostic and not import React Native, Express, or app-specific runtime code.
 
 6. Prefer minimal, targeted edits.
@@ -44,38 +45,37 @@ This repository is a monorepo template for a mobile app and API, using a deploye
 
 ## Repo-specific gotchas to avoid
 
-- Expo packages must match SDK 58. Use `npx expo install` and `npx expo install --fix` to select compatible native-module versions.
-  - Barcode scanning uses `CameraView` and `useCameraPermissions` from `expo-camera`; `expo-barcode-scanner` is not used.
-  - Reanimated 4 uses `react-native-worklets/plugin` in `babel.config.js`.
-  - FlashList v2 estimates item sizes automatically; do not pass the removed `estimatedItemSize` prop.
-- React Native 0.88 uses the strict TypeScript API. Use exported instance/event types instead of removed legacy types or deep imports.
-- React 19 tests using `react-test-renderer` should create and update render trees inside `act`.
-- Gluestack UI v1 is not the same as the newer Tailwind/className-based versions.
-  - Use the v1 compound component patterns and semantic sizing tokens, not the v2/v5 docs.
-- The workspace uses Nx. Prefer the project-level commands in `package.json` and `apps/*/project.json` instead of inventing ad hoc build scripts.
-- Do not commit secrets or local environment values. Use `.env` files locally and keep example values in `.env.example`-style files.
+- Expo SDK 58 uses React Native 0.88 and React 19.3. Keep Expo modules aligned with the SDK using `npx expo install --fix`, then run `npx expo-doctor`.
+  - Barcode scanning uses `CameraView` from `expo-camera`; `expo-barcode-scanner` is not part of this SDK.
+  - Reanimated 4 requires `react-native-worklets` and its Babel plugin as the final plugin.
+- The mobile app uses Gluestack UI v5 with locally generated components under `apps/mobile/components/ui` and NativeWind v4.
+  - Import the local UI components rather than the removed `@gluestack-ui/themed` package.
+  - Use NativeWind `className` utilities and theme-aware styles consistent with the existing wrappers.
+- Local services are orchestrated by the C# Aspire 17 AppHost in `AppHost/`. Use `npm run dev` to start the API, mobile app, and MongoDB together.
+- Do not commit secrets or local environment values. Local API and Expo configuration is managed by `AppHost/Program.cs`, which injects the mobile API URL directly without requiring `.env` files.
 
 ## Local development
+
+Use Node.js `>=22.13.0 <23` and npm `>=10` for the workspace and Expo CLI.
 
 ```bash
 npm install
 npm run dev
-npm run api
-npm run mobile
 npm run typecheck
 npm run test
 npm run test:coverage
 ```
 
-Useful Nx commands:
+Useful workspace commands:
 
 ```bash
-npx nx show projects
-npx nx run api:test
-npx nx run api:typecheck
-npx nx run mobile:typecheck
-npx nx run shared-types:typecheck
+npm run test:all
+npm run typecheck
+npm run api:build
+npm run validate:mobile
 ```
+
+Running the AppHost requires the .NET 10 SDK and a Docker-compatible container runtime.
 
 ## Testing expectations
 
@@ -85,7 +85,7 @@ npx nx run shared-types:typecheck
 
 ## Security and production posture
 
-- The configured beta OIDC identity provider is external to this workspace.
+- The hosted identity provider is external to this repository. Do not add local token or password fallbacks to the API or mobile app.
 - Do not store production credentials or signing keys in the repository.
 - API configuration should be environment-driven and validated using `process.env` or explicit config objects.
 - Keep OAuth2 and database configuration behind clear env variables and do not hard-code issuer URLs or secrets.

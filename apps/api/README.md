@@ -14,17 +14,22 @@ Node.js HTTP API for local development and production-oriented extension.
 
 ## Runtime configuration
 
+The local development values are supplied by the Aspire AppHost in
+`AppHost/Program.cs`; use `npm run dev` from the repository root to start the
+API with MongoDB and the mobile app. The API reads these environment variables
+for deployed environments:
+
 - `HOST`: bind address, default `0.0.0.0`.
-- `PORT`: TCP port from `1` to `65535`, default `4200`. Set it in
-  `apps/api/.env` to change the API port during `npm run dev`; the same value is
-  used for the local Expo API URL.
+- `PORT`: TCP port from `1` to `65535`, default `4200`.
 - `NODE_ENV`: runtime environment label, default `development`.
+- `LOG_LEVEL`: minimum emitted log severity (`debug`, `info`, `warn`, `error`, or `silent`); defaults to `debug` in development and `info` in production.
 - `DATABASE_URL`: MongoDB connection string for Prisma. Required for database access.
 - `AUTH_ISSUER_BASE_URL`: OAuth2/OIDC issuer base URL. Required for protected routes.
 - `AUTH_AUDIENCE`: expected OAuth2 access-token audience. Required for protected routes.
 - `AUTH_REQUIRED_SCOPES`: optional space- or comma-separated baseline scopes required by all protected routes. Feature-specific scopes are enforced at route level.
 
-Relationship and payment-request routes use these resource-server permissions:
+Relationship, payment-request, and joint-account-charge routes use these
+resource-server permissions:
 
 ```text
 relationships:read
@@ -35,29 +40,32 @@ payment-requests:read
 payment-requests:write
 ```
 
+API and mobile logs use the shared structured logger in `libs/logging`. Set
+`LOG_LEVEL` for the API or `EXPO_PUBLIC_LOG_LEVEL` for the Expo app. The chosen
+level and higher severities are emitted; `silent` disables log output. Log
+events intentionally omit credentials, tokens, request bodies, and raw
+identifier-bearing paths.
+
 ## Prisma + MongoDB
 
 This API is preconfigured for Prisma with a MongoDB datasource so you can attach a document-backed database without custom driver glue.
 
-1. Copy the sample values from `apps/api/.env.example`.
-2. Set `DATABASE_URL` to your MongoDB connection string.
-3. Define your application models in `apps/api/prisma/schema.prisma`.
-4. Run `npx prisma generate --schema=apps/api/prisma/schema.prisma` after changing the schema.
-5. For local database migrations in a MongoDB project, use `npx prisma db push --schema=apps/api/prisma/schema.prisma` or `npx prisma migrate dev` if you are using a relational provider.
+The AppHost provisions local MongoDB and supplies `DATABASE_URL`. For deployed
+environments, provide the database connection string through the hosting
+platform's configuration.
+
+1. Define your application models in `apps/api/prisma/schema.prisma`.
+2. Run `npx prisma generate --schema=apps/api/prisma/schema.prisma` after changing the schema.
+3. For MongoDB, use `npx prisma db push --schema=apps/api/prisma/schema.prisma` to apply schema changes.
 
 For MongoDB, Prisma uses the native `mongodb` provider and document IDs are represented as `ObjectId` strings.
 
-For the hosted identity provider, use:
-
-```powershell
-$env:AUTH_ISSUER_BASE_URL='https://identity-server-00186add9672.herokuapp.com/'; $env:AUTH_AUDIENCE='https://identity-server-00186add9672.herokuapp.com/resources/api'; npm run api
-```
-
-The API process defaults to the hosted issuer and
-`https://identity-server-00186add9672.herokuapp.com/resources/api` audience
-when they are not provided explicitly. Clients must send the OAuth access token
-as the bearer token. The ID token is for the OAuth client and has the client ID
-as its audience, so it is correctly rejected by this resource server.
+AppHost supplies the same issuer, audience, and client configuration to the API
+and Expo app. Deployed APIs must receive their own `AUTH_ISSUER_BASE_URL` and
+`AUTH_AUDIENCE` values from deployment configuration. Clients must send the
+OAuth access token as the bearer token. The ID token is for the OAuth client
+and has the client ID as its audience, so it is correctly rejected by this
+resource server.
 
 ## Commands
 
@@ -66,11 +74,25 @@ as its audience, so it is correctly rejected by this resource server.
 - `POST /api/v1/relationships/:relationshipId/invitations` creates a one-time invitation link for a relationship owner.
 - `GET /api/v1/invitations/:token` previews an invitation for an authenticated user.
 - `POST /api/v1/invitations/:token/accept` accepts an invitation using the authenticated user's subject claim.
-- `npm run api` starts the API through Nx.
-- `npx nx run api:test` runs the API contract tests.
-- `npx nx run api:typecheck` validates TypeScript without emitting files.
-- `npx nx run api:build` emits the compiled API to `dist/apps/api`.
-- `npm run dev` starts the mobile app and API together.
+- `GET` and `POST /api/v1/relationships/:relationshipId/joint-account-charges` list and create relationship charges.
+- `GET /api/v1/joint-account-charges/:chargeId` returns a charge to any active relationship member.
+- `POST /api/v1/joint-account-charges/:chargeId/update` edits a charge's name, amount, and date; only its creator can edit it.
+- `POST /api/v1/joint-account-charges/:chargeId/mark-paid` marks an unpaid charge as paid; only its creator can mark it paid.
+- `GET` and `POST /api/v1/relationships/:relationshipId/budgets` list and create calendar-based recurring budgets.
+- `GET`, `PATCH`, and `DELETE /api/v1/budgets/:budgetId` read, edit, and delete a budget; deletion removes the recurring series.
+- `POST /api/v1/budgets/:budgetId/approval` records a required member's approval.
+- `POST /api/v1/budgets/:budgetId/items` adds a dated item to an approved budget.
+- Budgets use ISO currency codes; legacy budgets without a currency are treated as USD.
+- Approved budgets renew for the next monthly, quarterly, or yearly period. Editing resets required approvals.
+- `npm run test --workspace=api` runs the API contract tests.
+- `npm run typecheck --workspace=api` validates TypeScript without emitting files.
+- `npm run api:build` generates Prisma and library artifacts, then emits the API to `dist/apps/api`.
+- `npm run dev` starts the API, mobile app, and MongoDB through the C# Aspire 17 AppHost in `AppHost/`.
+
+Sex status and mutation requests include an optional `today` value in
+`YYYY-MM-DD` form. The mobile app derives it from the device's local calendar
+with date-fns; the API accepts only dates within one calendar day of its UTC
+date, preventing a UTC midnight rollover from advancing the app's local day.
 
 ### OAuth2 architecture
 
@@ -92,9 +114,10 @@ bypass in shared or production code.
 
 ## Deploy to Heroku
 
-This repository is an Nx monorepo, so Heroku must be configured against the
-repository root, not `apps/api`. The root `build` script builds the API, and
-the root `Procfile` starts the compiled API with `npm run api:start`.
+This is an npm-workspaces monorepo, so Heroku must be configured against the
+repository root, not `apps/api`. The root `build` script generates the Prisma
+client and builds the shared libraries and API, and the root `Procfile` starts
+the compiled API with `npm run api:start`.
 
 ### Prerequisites
 
@@ -132,6 +155,10 @@ Or configure and deploy in one explicit command:
 npm run heroku:setup -- my-api-name --deploy
 ```
 
+`npm run api:build` regenerates the Prisma client and compiles the API. Run it
+after stopping the local API on Windows to avoid replacing Prisma's active
+query engine.
+
 Heroku will run the root `npm run build` lifecycle during deployment and then
 use the `web` process from `Procfile`. After deployment, verify the API with:
 
@@ -144,6 +171,21 @@ The expected response contains `"status":"ok"`. Logs are available with:
 ```sh
 heroku logs --tail --app my-api-name
 ```
+
+### Deploy API and mobile build
+
+From the repository root, deploy the API and then start the EAS production
+build:
+
+```sh
+npm run deploy:all -- my-api-name
+```
+
+The platform defaults to `all`. To build a single platform, pass `android` or
+`ios` as the second argument. The script waits for the Heroku deploy to finish
+before starting EAS, then returns without waiting for the remote mobile build.
+Commit the changes you want deployed first, and make sure the Heroku CLI and EAS
+account are authenticated.
 
 ### Connecting the mobile app
 

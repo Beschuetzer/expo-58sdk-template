@@ -1,4 +1,4 @@
-import type { HealthResponse } from '@expo-58sdk-template/shared-types';
+import type { HealthResponse } from '@expo-50sdk-template/shared-types';
 import type { Request, Response } from 'express';
 
 import type { ApiConfig } from '../config/env';
@@ -34,7 +34,7 @@ export function createHealthRoute(
       response.status(200).json(healthResponse);
     } catch (error) {
       logError('database_health_check_failed', {
-        error: error instanceof Error ? error.stack : String(error),
+        error,
       });
       response.status(503).json({
         service: 'api',

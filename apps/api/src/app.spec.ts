@@ -11,11 +11,6 @@ const listen = promisify(
   (server: ReturnType<typeof createServer>, callback: () => void) =>
     server.listen(0, '127.0.0.1', callback),
 );
-const TEST_AUTH_CLIENT_ID = 'test-client-id';
-
-function loadTestConfig(environment: NodeJS.ProcessEnv = {}) {
-  return loadConfig({ AUTH_CLIENT_ID: TEST_AUTH_CLIENT_ID, ...environment });
-}
 
 function get(
   server: ReturnType<typeof createServer>,
@@ -95,7 +90,7 @@ function postRaw(
 }
 
 test('GET /health returns an API health response', async (t) => {
-  const server = createServer(createApp(loadTestConfig()));
+  const server = createServer(createApp(loadConfig({})));
   await listen(server);
   t.after(() => server.close());
 
@@ -109,7 +104,7 @@ test('GET /health returns an API health response', async (t) => {
 });
 
 test('requests propagate an existing request ID', async (t) => {
-  const server = createServer(createApp(loadTestConfig()));
+  const server = createServer(createApp(loadConfig({})));
   await listen(server);
   t.after(() => server.close());
 
@@ -123,7 +118,7 @@ test('requests propagate an existing request ID', async (t) => {
 
 test('GET /health reports database degradation', async (t) => {
   const server = createServer(
-    createApp(loadTestConfig({ DATABASE_URL: 'mongodb://database' }), {
+    createApp(loadConfig({ DATABASE_URL: 'mongodb://database' }), {
       databaseHealth: {
         $runCommandRaw: async () => {
           throw new Error('database unavailable');
@@ -142,7 +137,7 @@ test('GET /health reports database degradation', async (t) => {
 });
 
 test('unknown routes return a not found response', async (t) => {
-  const server = createServer(createApp(loadTestConfig()));
+  const server = createServer(createApp());
   await listen(server);
   t.after(() => server.close());
 
@@ -153,7 +148,7 @@ test('unknown routes return a not found response', async (t) => {
 });
 
 test('protected routes require OAuth2 configuration by default', async (t) => {
-  const server = createServer(createApp(loadTestConfig()));
+  const server = createServer(createApp(loadConfig({})));
   await listen(server);
   t.after(() => server.close());
 
@@ -166,9 +161,10 @@ test('protected routes require OAuth2 configuration by default', async (t) => {
 test('protected routes reject an anonymous request with HTTP 401', async (t) => {
   const server = createServer(
     createApp(
-      loadTestConfig({
-        AUTH_AUDIENCE: 'api',
-        AUTH_ISSUER_BASE_URL: 'https://identity.example.com',
+      loadConfig({
+        AUTH_AUDIENCE:
+          'https://identity-server-00186add9672.herokuapp.com/resources/api',
+        AUTH_ISSUER_BASE_URL: 'http://127.0.0.1:4300',
       }),
     ),
   );
@@ -191,7 +187,7 @@ for (const [name, errorMessage] of [
       next(error);
     };
     const server = createServer(
-      createApp(loadTestConfig(), { authMiddleware: rejected }),
+      createApp(loadConfig({}), { authMiddleware: rejected }),
     );
     await listen(server);
     t.after(() => server.close());
@@ -209,7 +205,7 @@ test('protected routes reject requests missing required scopes', async (t) => {
     next(Object.assign(new Error('Insufficient scope'), { statusCode: 403 }));
   };
   const server = createServer(
-    createApp(loadTestConfig(), { authMiddleware: rejected }),
+    createApp(loadConfig({}), { authMiddleware: rejected }),
   );
   await listen(server);
   t.after(() => server.close());
@@ -222,7 +218,7 @@ test('protected routes reject requests missing required scopes', async (t) => {
 });
 
 test('malformed JSON returns a bad request response', async (t) => {
-  const server = createServer(createApp(loadTestConfig()));
+  const server = createServer(createApp(loadConfig({})));
   await listen(server);
   t.after(() => server.close());
 
@@ -242,7 +238,7 @@ test('protected routes can use an injected authentication adapter', async (t) =>
     next();
   };
   const server = createServer(
-    createApp(loadTestConfig(), { authMiddleware: authenticated }),
+    createApp(loadConfig({}), { authMiddleware: authenticated }),
   );
   await listen(server);
   t.after(() => server.close());
@@ -254,12 +250,13 @@ test('protected routes can use an injected authentication adapter', async (t) =>
 });
 
 test('configuration uses defaults and validates the port', () => {
-  assert.deepEqual(loadTestConfig(), {
+  assert.deepEqual(loadConfig({}), {
     environment: 'development',
+    logLevel: 'debug',
     host: '0.0.0.0',
     port: 4200,
     databaseUrl: undefined,
-    oauthClientId: TEST_AUTH_CLIENT_ID,
+    oauthClientId: 'mobile-development-client',
     corsOrigin: 'http://localhost:8081',
     oauth2: {
       issuerBaseUrl: undefined,
@@ -267,25 +264,20 @@ test('configuration uses defaults and validates the port', () => {
       requiredScopes: [],
     },
   });
-  assert.equal(loadTestConfig({ PORT: '4300' }).port, 4300);
   assert.throws(
-    () => loadTestConfig({ PORT: 'invalid' }),
+    () => loadConfig({ PORT: 'invalid' }),
     /PORT must be an integer/,
   );
-});
-
-test('configuration requires an OAuth client ID', () => {
-  assert.throws(() => loadConfig({}), /AUTH_CLIENT_ID must be set/);
-});
-
-test('configuration uses the configured OAuth client ID', () => {
-  const config = loadTestConfig({ AUTH_CLIENT_ID: 'registered-client' });
-
-  assert.equal(config.oauthClientId, 'registered-client');
+  assert.throws(
+    () => loadConfig({ LOG_LEVEL: 'verbose' }),
+    /LOG_LEVEL must be one of/,
+  );
+  assert.equal(loadConfig({ NODE_ENV: 'production' }).logLevel, 'info');
+  assert.equal(loadConfig({ LOG_LEVEL: 'error' }).logLevel, 'error');
 });
 
 test('configuration normalizes the OAuth issuer URL', () => {
-  const config = loadTestConfig({
+  const config = loadConfig({
     AUTH_ISSUER_BASE_URL: 'https://identity.example.com///',
   });
 

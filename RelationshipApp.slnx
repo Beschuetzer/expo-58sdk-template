@@ -1,0 +1,5 @@
+<Solution>
+  <Folder Name="/AppHost/">
+    <Project Path="AppHost/Relationship.AppHost.csproj" />
+  </Folder>
+</Solution>

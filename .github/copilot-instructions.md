@@ -1,6 +1,6 @@
 # Copilot instructions
 
-This repo is a monorepo template for an Expo mobile app and a TypeScript API, using a deployed external OIDC identity provider.
+This repo is a monorepo template for an Expo mobile app and a TypeScript API using a hosted identity provider.
 
 ## Mandatory conventions
 
@@ -21,8 +21,6 @@ This repo is a monorepo template for an Expo mobile app and a TypeScript API, us
 ```bash
 npm install
 npm run dev
-npm run api
-npm run mobile
 npm run typecheck
 npm run test
 npm run test:coverage
@@ -30,9 +28,9 @@ npm run test:coverage
 
 ## Gotchas
 
-- The mobile app uses Expo SDK 58 and React Native 0.88. Keep Expo native-module versions aligned with the SDK, use `expo-camera` for barcode scanning, and check installed APIs before upgrading third-party native packages.
-- The repo uses Nx and project-specific configs; prefer the existing project commands over ad hoc shell scripts.
-- The beta identity provider is external to this workspace.
+- The mobile app uses Expo SDK 58 / React Native 0.88. Align Expo modules with `npx expo install --fix`; camera scanning uses `CameraView` from `expo-camera`.
+- Local services are orchestrated by the C# Aspire 17 AppHost in `AppHost/`; use `npm run dev` for local startup and keep local service configuration in `AppHost/Program.cs`.
+- Authentication is delegated to the hosted identity provider configured through environment variables.
 
 ## Quality bar
 

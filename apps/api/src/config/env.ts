@@ -1,5 +1,8 @@
+import { parseLogLevel, type LogLevel } from '@expo-50sdk-template/logging';
+
 export interface ApiConfig {
   environment: string;
+  logLevel: LogLevel;
   host: string;
   port: number;
   databaseUrl?: string;
@@ -14,6 +17,7 @@ export interface ApiConfig {
 
 const DEFAULT_HOST = '0.0.0.0';
 const DEFAULT_PORT = 4200;
+const DEFAULT_OAUTH_CLIENT_ID = 'mobile-development-client';
 const DEFAULT_CORS_ORIGIN = 'http://localhost:8081';
 
 function parsePort(value: string | undefined) {
@@ -32,22 +36,23 @@ function parsePort(value: string | undefined) {
 export function loadConfig(
   environment: NodeJS.ProcessEnv = process.env,
 ): ApiConfig {
-  const oauthClientId = environment.AUTH_CLIENT_ID?.trim();
-  if (!oauthClientId) {
-    throw new Error('AUTH_CLIENT_ID must be set');
-  }
-
+  const runtimeEnvironment = environment.NODE_ENV ?? 'development';
   const requiredScopes = (environment.AUTH_REQUIRED_SCOPES ?? '')
     .split(/[ ,]+/)
     .map((scope) => scope.trim())
     .filter(Boolean);
 
   return {
-    environment: environment.NODE_ENV ?? 'development',
+    environment: runtimeEnvironment,
+    logLevel: parseLogLevel(
+      environment.LOG_LEVEL,
+      runtimeEnvironment === 'production' ? 'info' : 'debug',
+    ),
     host: environment.HOST?.trim() || DEFAULT_HOST,
     port: parsePort(environment.PORT),
     databaseUrl: environment.DATABASE_URL?.trim() || undefined,
-    oauthClientId,
+    oauthClientId:
+      environment.AUTH_CLIENT_ID?.trim() || DEFAULT_OAUTH_CLIENT_ID,
     corsOrigin: environment.CORS_ORIGIN?.trim() || DEFAULT_CORS_ORIGIN,
     oauth2: {
       issuerBaseUrl:

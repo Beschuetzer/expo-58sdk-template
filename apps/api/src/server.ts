@@ -16,7 +16,7 @@ export function createApiServer(config: ApiConfig = loadConfig()) {
 
 export function startApiServer(server: Server, config: ApiConfig) {
   server.listen(config.port, config.host, () => {
-    logInfo('api_server_listening', {
+    logInfo('api_server_started', {
       environment: config.environment,
       host: config.host,
       port: config.port,

@@ -3,7 +3,6 @@
   "compilerOptions": {
     "noEmit": false,
     "declaration": true,
-    "emitDeclarationOnly": true,
     "outDir": "../../dist/libs/shared-types",
     "rootDir": "./src"
   }

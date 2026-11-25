@@ -1,6 +1,7 @@
 import type { Request, Response } from 'express';
 
 import type { ApiConfig } from '../config/env';
+import { logDebug, logInfo, logWarn } from '../logging';
 
 const COOKIE_NAME = 'bff_access_token';
 const REFRESH_COOKIE_NAME = 'bff_refresh_token';
@@ -24,6 +25,9 @@ export async function exchangeBffCode(
 ) {
   const issuer = config.oauth2.issuerBaseUrl;
   if (!issuer) {
+    logWarn('oauth_token_exchange_unavailable', {
+      requestId: response.locals.requestId,
+    });
     response.status(503).json({
       message: 'OAuth2 authentication is not configured.',
       status: 'auth_not_configured',
@@ -61,10 +65,17 @@ export async function exchangeBffCode(
   });
   const token = (await tokenResponse.json()) as Record<string, unknown>;
   if (!tokenResponse.ok || typeof token.access_token !== 'string') {
+    logWarn('oauth_token_exchange_failed', {
+      requestId: response.locals.requestId,
+      statusCode: tokenResponse.status,
+    });
     response.status(tokenResponse.status).json(token);
     return;
   }
 
+  logInfo('oauth_token_exchange_succeeded', {
+    requestId: response.locals.requestId,
+  });
   response.setHeader('Set-Cookie', [
     `${COOKIE_NAME}=${encodeURIComponent(token.access_token)}; ${cookieFlags(config)}`,
     ...(typeof token.refresh_token === 'string'
@@ -75,6 +86,7 @@ export async function exchangeBffCode(
   ]);
   response.json({
     expires_in: token.expires_in,
+    id_token: token.id_token,
     scope: token.scope,
     token_type: token.token_type,
   });
@@ -88,6 +100,9 @@ export async function refreshBffSession(
   const issuer = config.oauth2.issuerBaseUrl;
   const refreshToken = readCookie(request, REFRESH_COOKIE_NAME);
   if (!issuer || !refreshToken) {
+    logDebug('oauth_refresh_rejected_missing_session', {
+      requestId: response.locals.requestId,
+    });
     response.status(401).json({
       message: 'A refresh session is required.',
       status: 'invalid_grant',
@@ -110,16 +125,24 @@ export async function refreshBffSession(
     typeof token.access_token !== 'string' ||
     typeof token.refresh_token !== 'string'
   ) {
+    logWarn('oauth_refresh_failed', {
+      requestId: response.locals.requestId,
+      statusCode: tokenResponse.status,
+    });
     response.status(tokenResponse.status).json(token);
     return;
   }
 
+  logInfo('oauth_refresh_succeeded', {
+    requestId: response.locals.requestId,
+  });
   response.setHeader('Set-Cookie', [
     `${COOKIE_NAME}=${encodeURIComponent(token.access_token)}; ${cookieFlags(config)}`,
     `${REFRESH_COOKIE_NAME}=${encodeURIComponent(token.refresh_token)}; ${cookieFlags(config)}`,
   ]);
   response.json({
     expires_in: token.expires_in,
+    id_token: token.id_token,
     scope: token.scope,
     token_type: token.token_type,
   });
@@ -130,6 +153,9 @@ export function clearBffSession(
   response: Response,
   config: ApiConfig,
 ) {
+  logDebug('oauth_session_cleared', {
+    requestId: response.locals.requestId,
+  });
   response.setHeader('Set-Cookie', [
     `${COOKIE_NAME}=; Max-Age=0; ${cookieFlags(config)}`,
     `${REFRESH_COOKIE_NAME}=; Max-Age=0; ${cookieFlags(config)}`,

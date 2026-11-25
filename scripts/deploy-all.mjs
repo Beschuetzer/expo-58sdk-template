@@ -18,21 +18,19 @@ function printUsage() {
   );
 }
 
-function runNpm(commandArgs, options = {}) {
-  const npmCliPath = process.env.npm_execpath;
-  if (!npmCliPath) {
-    console.error('Unable to locate npm CLI. Run this using npm run deploy:all.');
-    process.exit(1);
-  }
+function commandName(command) {
+  return process.platform === 'win32' ? `${command}.cmd` : command;
+}
 
-  const result = spawnSync(process.execPath, [npmCliPath, ...commandArgs], {
+function run(command, commandArgs, options = {}) {
+  const result = spawnSync(commandName(command), commandArgs, {
     cwd: workspaceRoot,
     stdio: 'inherit',
     ...options,
   });
 
   if (result.error) {
-    console.error(`Unable to run npm: ${result.error.message}`);
+    console.error(`Unable to run ${command}: ${result.error.message}`);
     process.exit(1);
   }
 
@@ -58,16 +56,14 @@ if (args.length > 2 || !validPlatforms.includes(platform)) {
 }
 
 console.log(`Deploying API to Heroku app ${appName}...`);
-runNpm(['run', 'heroku:setup', '--', appName, '--deploy']);
+run('npm', ['run', 'heroku:setup', '--', appName, '--deploy']);
 
 console.log(`Starting EAS production build for ${platform}...`);
-runNpm(
+run(
+  'npx',
   [
-    'exec',
     '--yes',
-    '--package=eas-cli@latest',
-    '--',
-    'eas',
+    'eas-cli@latest',
     'build',
     '--platform',
     platform,

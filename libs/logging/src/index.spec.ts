@@ -22,6 +22,22 @@ test('filters entries below the configured severity threshold', () => {
   );
 });
 
+test('forwards sanitized entries to additional log sinks', () => {
+  const consoleEntries: LogEntry[] = [];
+  const otelEntries: LogEntry[] = [];
+  const logger = createLogger({
+    level: 'debug',
+    service: 'test',
+    sink: (entry) => consoleEntries.push(entry),
+    onLogEntry: (entry) => otelEntries.push(entry),
+  });
+
+  logger.info('auth_event', { accessToken: 'private-token' });
+
+  assert.deepEqual(otelEntries, consoleEntries);
+  assert.equal(otelEntries[0].accessToken, '[REDACTED]');
+});
+
 test('redacts secret fields and sensitive values nested in objects', () => {
   const entries: LogEntry[] = [];
   const logger = createLogger({
@@ -47,26 +63,6 @@ test('redacts secret fields and sensitive values nested in objects', () => {
   assert.match(output, /\[REDACTED_EMAIL\]/);
 });
 
-test('redacts BFF access, ID, and refresh token fields', () => {
-  const entries: LogEntry[] = [];
-  const logger = createLogger({
-    level: 'debug',
-    service: 'test',
-    sink: (entry) => entries.push(entry),
-  });
-
-  logger.info('auth_event', {
-    bff_access_token: 'bff-access-secret',
-    bff_id_token: 'bff-id-secret',
-    bff_refresh_token: 'bff-refresh-secret',
-  });
-
-  assert.equal(entries.length, 1);
-  assert.equal(entries[0].bff_access_token, '[REDACTED]');
-  assert.equal(entries[0].bff_id_token, '[REDACTED]');
-  assert.equal(entries[0].bff_refresh_token, '[REDACTED]');
-});
-
 test('handles circular values and errors without throwing', () => {
   const entries: LogEntry[] = [];
   const logger = createLogger({
@@ -84,24 +80,6 @@ test('handles circular values and errors without throwing', () => {
   assert.equal(entries.length, 1);
   assert.match(JSON.stringify(entries[0]), /\[Circular\]/);
   assert.doesNotMatch(JSON.stringify(entries[0]), /user@example\.com/);
-});
-
-test('serializes invalid dates without interrupting logging', () => {
-  const entries: LogEntry[] = [];
-  const logger = createLogger({
-    level: 'info',
-    service: 'test',
-    sink: (entry) => entries.push(entry),
-  });
-
-  logger.info('date_event', {
-    createdAt: new Date('2025-01-01T00:00:00.000Z'),
-    invalidAt: new Date(Number.NaN),
-  });
-
-  assert.equal(entries.length, 1);
-  assert.equal(entries[0].createdAt, '2025-01-01T00:00:00.000Z');
-  assert.equal(entries[0].invalidAt, 'Invalid Date');
 });
 
 test('supports silent mode and validates environment values', () => {

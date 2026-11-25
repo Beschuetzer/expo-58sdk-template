@@ -17,11 +17,6 @@ const sharedTypesPackagePath = path.join(
 const mobileAppConfigPath = path.join(root, 'apps', 'mobile', 'app.json');
 const mobileRoot = path.dirname(mobileAppConfigPath);
 const easConfigPath = path.join(root, 'apps', 'mobile', 'eas.json');
-const apiEnvPath = path.join(root, 'apps', 'api', '.env');
-const apiEnvExamplePath = path.join(root, 'apps', 'api', '.env.example');
-const startDevScriptPath = path.join(root, 'scripts', 'start-dev.mjs');
-const startMongoScriptPath = path.join(root, 'scripts', 'start-mongodb.mjs');
-const stopMongoScriptPath = path.join(root, 'scripts', 'stop-mongodb.mjs');
 const sharedTypesReferenceFiles = [
   path.join(root, 'apps', 'api', 'src', 'routes', 'health.ts'),
   path.join(root, 'apps', 'api', 'tsconfig.build.json'),
@@ -31,7 +26,7 @@ const sharedTypesReferenceFiles = [
   path.join(root, 'apps', 'mobile', 'tsconfig.json'),
   path.join(root, 'README.md'),
 ];
-const templateSharedTypesName = '@expo-58sdk-template/shared-types';
+const templateSharedTypesName = '@expo-50sdk-template/shared-types';
 const EAS_PROJECT_ID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -53,7 +48,6 @@ function ensureEasProject() {
   const result = spawnSync(command, ['--yes', 'eas-cli@latest', 'init'], {
     cwd: mobileRoot,
     stdio: 'inherit',
-    shell: process.platform === 'win32',
   });
 
   if (result.error) {
@@ -91,47 +85,6 @@ function compactIdentifier(value) {
   return value.replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
 }
 
-function quoteEnv(value) {
-  return JSON.stringify(value);
-}
-
-function readEnvValue(filePath, key) {
-  if (!fs.existsSync(filePath)) return undefined;
-
-  const line = fs
-    .readFileSync(filePath, 'utf8')
-    .split(/\r?\n/)
-    .find((entry) => entry.trimStart().startsWith(`${key}=`));
-  if (!line) return undefined;
-
-  const value = line.slice(line.indexOf('=') + 1).trim();
-  if (value.startsWith('"') && value.endsWith('"')) {
-    return JSON.parse(value);
-  }
-  if (value.startsWith("'") && value.endsWith("'")) {
-    return value.slice(1, -1);
-  }
-  return value || undefined;
-}
-
-function writeIfMissing(filePath, contents) {
-  if (fs.existsSync(filePath)) {
-    return false;
-  }
-  fs.writeFileSync(filePath, contents, 'utf8');
-  return true;
-}
-
-function setEnvValue(filePath, key, value) {
-  const contents = fs.readFileSync(filePath, 'utf8');
-  const entry = `${key}=${quoteEnv(value)}`;
-  const pattern = new RegExp(`^${key}=.*$`, 'm');
-  const updatedContents = pattern.test(contents)
-    ? contents.replace(pattern, entry)
-    : `${contents}${contents.endsWith('\n') ? '' : '\n'}${entry}\n`;
-  fs.writeFileSync(filePath, updatedContents, 'utf8');
-}
-
 function updateJson(filePath, update) {
   const document = JSON.parse(fs.readFileSync(filePath, 'utf8'));
   update(document);
@@ -152,19 +105,19 @@ function updatePackageNames(packageName, sharedTypesName) {
     lockfile.packages[''].name = packageName;
 
     const oldSharedTypesEntry =
-      lockfile.packages['node_modules/@expo-58sdk-template/shared-types'];
+      lockfile.packages['node_modules/@expo-50sdk-template/shared-types'];
     if (oldSharedTypesEntry) {
       delete lockfile.packages[
-        'node_modules/@expo-58sdk-template/shared-types'
+        'node_modules/@expo-50sdk-template/shared-types'
       ];
       lockfile.packages[`node_modules/${sharedTypesName}`] =
         oldSharedTypesEntry;
     }
 
-    if (lockfile.dependencies?.['@expo-58sdk-template/shared-types']) {
+    if (lockfile.dependencies?.['@expo-50sdk-template/shared-types']) {
       lockfile.dependencies[sharedTypesName] =
-        lockfile.dependencies['@expo-58sdk-template/shared-types'];
-      delete lockfile.dependencies['@expo-58sdk-template/shared-types'];
+        lockfile.dependencies['@expo-50sdk-template/shared-types'];
+      delete lockfile.dependencies['@expo-50sdk-template/shared-types'];
     }
   });
 
@@ -178,44 +131,6 @@ function updatePackageNames(packageName, sharedTypesName) {
   }
 }
 
-function updateMongoScripts(containerName, databaseName) {
-  const startMongoScript = fs
-    .readFileSync(startMongoScriptPath, 'utf8')
-    .replace(
-      /const containerName = '[^']+';/,
-      `const containerName = '${containerName}';`,
-    )
-    .replace(
-      /const volumeName = '[^']+';/,
-      `const volumeName = '${containerName}-data';`,
-    )
-    .replace(
-      /MONGO_INITDB_DATABASE=[^']+/,
-      `MONGO_INITDB_DATABASE=${databaseName}`,
-    )
-    .replace(
-      /(MongoDB is ready at mongodb:\/\/127\.0\.0\.1:\$\{hostPort\}\/)[^`]+/,
-      `$1${databaseName}`,
-    );
-  fs.writeFileSync(startMongoScriptPath, startMongoScript, 'utf8');
-
-  const startDevScript = fs
-    .readFileSync(startDevScriptPath, 'utf8')
-    .replace(
-      /(DATABASE_URL: `mongodb:\/\/127\.0\.0\.1:\$\{mongoPort\}\/)[^`]+/,
-      `$1${databaseName}`,
-    );
-  fs.writeFileSync(startDevScriptPath, startDevScript, 'utf8');
-
-  const stopMongoScript = fs
-    .readFileSync(stopMongoScriptPath, 'utf8')
-    .replace(
-      /const containerName = '[^']+';/,
-      `const containerName = '${containerName}';`,
-    );
-  fs.writeFileSync(stopMongoScriptPath, stopMongoScript, 'utf8');
-}
-
 async function ask(rl, label, defaultValue) {
   const answer = (await rl.question(`${label} [${defaultValue}]: `)).trim();
   return answer || defaultValue;
@@ -225,7 +140,7 @@ async function main() {
   const rl = readline.createInterface({ input, output });
   try {
     const defaultName =
-      path.basename(root) === 'expo-58sdk-template'
+      path.basename(root) === 'expo-50sdk-template'
         ? 'My Expo App'
         : path.basename(root);
     const displayName = await ask(rl, 'Display name', defaultName);
@@ -233,7 +148,6 @@ async function main() {
     const identifier = compactIdentifier(slug);
     const mongoName = slugify(slug) || 'app';
     const sharedTypesName = `@${mongoName}/shared-types`;
-    const databaseName = mongoName.replace(/-/g, '_');
     const bundleIdentifier = await ask(
       rl,
       'iOS bundle identifier',
@@ -246,11 +160,13 @@ async function main() {
       'Deployed API URL',
       'https://your-production-api.example.com',
     );
+    const easConfig = JSON.parse(fs.readFileSync(easConfigPath, 'utf8'));
     const issuerUrlDefault =
-      readEnvValue(apiEnvPath, 'AUTH_ISSUER_BASE_URL') ||
-      readEnvValue(apiEnvExamplePath, 'AUTH_ISSUER_BASE_URL');
+      easConfig.build.production.env?.EXPO_PUBLIC_IDP_URL;
     if (!issuerUrlDefault) {
-      throw new Error('AUTH_ISSUER_BASE_URL must be set in the API env file.');
+      throw new Error(
+        'EXPO_PUBLIC_IDP_URL must be set in the production EAS profile.',
+      );
     }
     const issuerUrl = await ask(rl, 'OAuth/OIDC issuer URL', issuerUrlDefault);
     const normalizedIssuerUrl = issuerUrl.replace(/\/+$/, '');
@@ -282,15 +198,6 @@ async function main() {
       }
     });
 
-    updateMongoScripts(mongoName, databaseName);
-
-    const createdApiEnv = writeIfMissing(
-      apiEnvPath,
-      fs.readFileSync(apiEnvExamplePath, 'utf8'),
-    );
-    setEnvValue(apiEnvPath, 'AUTH_ISSUER_BASE_URL', normalizedIssuerUrl);
-    setEnvValue(apiEnvPath, 'AUTH_AUDIENCE', audience);
-
     rl.close();
     const easProjectId = ensureEasProject();
 
@@ -298,7 +205,6 @@ async function main() {
     console.log(`- Expo slug: ${slug}`);
     console.log(`- Bundle/package identity: ${bundleIdentifier}`);
     console.log(`- EAS project: ${easProjectId}`);
-    if (createdApiEnv) console.log('- Created apps/api/.env from its example.');
     console.log(
       'Secrets and production provider credentials still need to be configured.',
     );

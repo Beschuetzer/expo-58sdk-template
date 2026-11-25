@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "692799932534",
+    "project_id": "relationship-app-notifications",
+    "storage_bucket": "relationship-app-notifications.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:692799932534:android:fa85da7ba319649c193757",
+        "android_client_info": {
+          "package_name": "com.adammajor.relationshipapp"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyB_6vEdUsk1IK-Wg2TWSB5szmlsHNi6AEI"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:692799932534:android:302e56e60b37a21a193757",
+        "android_client_info": {
+          "package_name": "com.adammajor.relationshipapp"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyB_6vEdUsk1IK-Wg2TWSB5szmlsHNi6AEI"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

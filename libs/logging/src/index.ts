@@ -23,6 +23,7 @@ export type LoggerOptions = {
   level: LogLevel;
   service: string;
   sink?: (entry: LogEntry) => void;
+  onLogEntry?: (entry: LogEntry) => void;
 };
 
 const levelPriority: Record<Exclude<LogLevel, 'silent'>, number> = {
@@ -33,7 +34,7 @@ const levelPriority: Record<Exclude<LogLevel, 'silent'>, number> = {
 };
 
 const sensitiveKeyPattern =
-  /^(?:(?:bff_)?(?:access_?token|id_?token|refresh_?token)|token|authorization|cookie|set_cookie|client_secret|secret|password|passwd|credential|credentials|code|code_verifier|nonce|state|email|phone|subject|user_id|userid|session_id|sessionid|api_key|private_key|signature)$/i;
+  /^(?:access_?token|id_?token|refresh_?token|token|authorization|cookie|set_cookie|client_secret|secret|password|passwd|credential|credentials|code|code_verifier|nonce|state|email|phone|subject|user_id|userid|session_id|sessionid|api_key|private_key|signature)$/i;
 
 const secretTextPattern =
   /(^|[^a-z0-9])((?:access[_-]?token|id[_-]?token|refresh[_-]?token|token|code[_-]?verifier|client[_-]?secret|password|authorization|cookie|code))=([^&\s]+)/gi;
@@ -98,9 +99,7 @@ function sanitizeValue(
   }
   if (depth >= MAX_DEPTH) return '[Max depth reached]';
   if (seen.has(value)) return '[Circular]';
-  if (value instanceof Date) {
-    return Number.isNaN(value.getTime()) ? 'Invalid Date' : value.toISOString();
-  }
+  if (value instanceof Date) return value.toISOString();
 
   seen.add(value);
   if (value instanceof Error) {
@@ -159,13 +158,15 @@ export function createLogger(options: LoggerOptions): Logger {
     }
 
     const safeFields = sanitizeValue(fields, new WeakSet(), 0) as LogFields;
-    sink({
+    const entry: LogEntry = {
       ...safeFields,
       timestamp: new Date().toISOString(),
       service: options.service,
       level,
       event: redactString(event),
-    });
+    };
+    sink(entry);
+    options.onLogEntry?.(entry);
   }
 
   return {
@@ -175,3 +176,9 @@ export function createLogger(options: LoggerOptions): Logger {
     error: (event, fields) => write('error', event, fields),
   };
 }
+
+export {
+  createOtlpLogSink,
+  type OtlpLogSink,
+  type OtlpLogSinkOptions,
+} from './otel';

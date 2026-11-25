@@ -1,19 +1,45 @@
-import { PrismaClient } from '@prisma/client';
+import { Prisma, PrismaClient } from '@prisma/client';
 
-import { logError, logInfo } from '../logging';
+import { logDebug, logError, logInfo, logWarn } from '../logging';
+
+type PrismaLogLevel = 'query' | 'error' | 'warn';
+type LoggingPrismaClient = PrismaClient<
+  Prisma.PrismaClientOptions,
+  PrismaLogLevel
+>;
 
 const globalForPrisma = globalThis as unknown as {
-  prisma?: PrismaClient;
+  prisma?: LoggingPrismaClient;
 };
 
-export const prisma =
+export const prisma: LoggingPrismaClient =
   globalForPrisma.prisma ??
-  new PrismaClient({
+  new PrismaClient<Prisma.PrismaClientOptions, PrismaLogLevel>({
     log:
       process.env.NODE_ENV === 'development'
-        ? ['query', 'error', 'warn']
-        : ['error', 'warn'],
+        ? [
+            { emit: 'event', level: 'query' },
+            { emit: 'event', level: 'error' },
+            { emit: 'event', level: 'warn' },
+          ]
+        : [
+            { emit: 'event', level: 'error' },
+            { emit: 'event', level: 'warn' },
+          ],
   });
+
+prisma.$on('query', (event) => {
+  logDebug('database_query_completed', {
+    durationMs: event.duration,
+    target: event.target,
+  });
+});
+prisma.$on('warn', (event) => {
+  logWarn('database_client_warning', { target: event.target });
+});
+prisma.$on('error', (event) => {
+  logError('database_client_error', { target: event.target });
+});
 
 if (process.env.NODE_ENV !== 'production') {
   globalForPrisma.prisma = prisma;
@@ -28,12 +54,16 @@ export async function connectPrisma(databaseUrl?: string) {
   }
 
   try {
+    const startedAt = Date.now();
     await prisma.$connect();
-    logInfo('database_connected', { provider: 'mongodb' });
+    logInfo('database_connected', {
+      durationMs: Date.now() - startedAt,
+      provider: 'mongodb',
+    });
     return true;
   } catch (error) {
     logError('database_connection_failed', {
-      error: error instanceof Error ? error.stack : String(error),
+      error,
       provider: 'mongodb',
     });
     return false;

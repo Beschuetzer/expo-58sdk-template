@@ -3,7 +3,43 @@ import { randomUUID } from 'node:crypto';
 
 import { createOAuth2Middleware, type AuthMiddleware } from './auth/middleware';
 import { loadConfig, type ApiConfig } from './config/env';
-import { logError, logInfo } from './logging';
+import { createBudgetRouter } from './features/budgets/routes';
+import {
+  PrismaBudgetService,
+  type BudgetService,
+} from './features/budgets/service';
+import { createDateNightRouter } from './features/dateNights/routes';
+import {
+  PrismaDateNightService,
+  type DateNightService,
+} from './features/dateNights/service';
+import { createJointAccountChargeRouter } from './features/jointAccountCharges/routes';
+import {
+  PrismaJointAccountChargeService,
+  type JointAccountChargeService,
+} from './features/jointAccountCharges/service';
+import { createPaymentRequestRouter } from './features/paymentRequests/routes';
+import {
+  PrismaPaymentRequestService,
+  type PaymentRequestService,
+} from './features/paymentRequests/service';
+import { createRelationshipRuleRouter } from './features/relationshipRules/routes';
+import {
+  PrismaRelationshipRuleService,
+  type RelationshipRuleService,
+} from './features/relationshipRules/service';
+import { createSexRouter } from './features/sex/routes';
+import { PrismaSexService, type SexService } from './features/sex/service';
+import { createTimeRouter } from './features/time/routes';
+import { PrismaTimeService, type TimeService } from './features/time/service';
+import prisma from './lib/prisma';
+import {
+  configureApiLogging,
+  logDebug,
+  logError,
+  logInfo,
+  logWarn,
+} from './logging';
 import {
   clearBffSession,
   exchangeBffCode,
@@ -11,19 +47,42 @@ import {
 } from './routes/bffAuth';
 import { createHealthRoute, type DatabaseHealth } from './routes/health';
 import { meRoute } from './routes/me';
+import { createMobileLogsRouter } from './routes/mobileLogs';
 
 export type CreateAppOptions = {
   authMiddleware?: AuthMiddleware;
   databaseHealth?: DatabaseHealth;
+  budgetService?: BudgetService;
+  jointAccountChargeService?: JointAccountChargeService;
+  paymentRequestService?: PaymentRequestService;
+  relationshipRuleService?: RelationshipRuleService;
+  sexService?: SexService;
+  dateNightService?: DateNightService;
+  timeService?: TimeService;
 };
 
 export function createApp(
   config: ApiConfig = loadConfig(),
   options: CreateAppOptions = {},
 ): Express {
+  configureApiLogging(config.logLevel);
   const app = express();
   const authMiddleware =
     options.authMiddleware ?? createOAuth2Middleware(config);
+  const paymentRequestService =
+    options.paymentRequestService ?? new PrismaPaymentRequestService(prisma);
+  const jointAccountChargeService =
+    options.jointAccountChargeService ??
+    new PrismaJointAccountChargeService(prisma);
+  const budgetService =
+    options.budgetService ?? new PrismaBudgetService(prisma);
+  const relationshipRuleService =
+    options.relationshipRuleService ??
+    new PrismaRelationshipRuleService(prisma);
+  const timeService = options.timeService ?? new PrismaTimeService(prisma);
+  const sexService = options.sexService ?? new PrismaSexService(prisma);
+  const dateNightService =
+    options.dateNightService ?? new PrismaDateNightService(prisma);
 
   app.disable('x-powered-by');
   app.use((request, response, next) => {
@@ -36,11 +95,17 @@ export function createApp(
 
     response.locals.requestId = requestId;
     response.setHeader('X-Request-ID', requestId);
+    logDebug('http_request_started', {
+      method: request.method,
+      requestId,
+    });
     response.on('finish', () => {
       logInfo('http_request', {
         durationMs: Date.now() - startedAt,
         method: request.method,
-        path: request.path,
+        route: request.route
+          ? `${request.baseUrl}${String(request.route.path)}`
+          : 'unmatched',
         requestId,
         statusCode: response.statusCode,
       });
@@ -49,11 +114,20 @@ export function createApp(
   });
   app.use((request, response, next) => {
     const origin = request.headers.origin;
+    if (origin && origin !== config.corsOrigin) {
+      logWarn('cors_origin_rejected', {
+        method: request.method,
+        requestId: response.locals.requestId,
+      });
+    }
     if (origin && origin === config.corsOrigin) {
       response.setHeader('Access-Control-Allow-Origin', origin);
       response.setHeader('Access-Control-Allow-Credentials', 'true');
       response.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-      response.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+      response.setHeader(
+        'Access-Control-Allow-Methods',
+        'GET, POST, PATCH, DELETE, OPTIONS',
+      );
       response.setHeader('Vary', 'Origin');
     }
     if (request.method === 'OPTIONS') {
@@ -76,9 +150,27 @@ export function createApp(
   app.get('/auth/session', authMiddleware, (_request, response) => {
     response.status(204).end();
   });
+  app.use(
+    '/api/v1',
+    authMiddleware,
+    ...(config.environment === 'development' ? [createMobileLogsRouter()] : []),
+    createPaymentRequestRouter(paymentRequestService),
+    createJointAccountChargeRouter(jointAccountChargeService),
+    createBudgetRouter(budgetService),
+    createRelationshipRuleRouter(relationshipRuleService),
+    createTimeRouter(timeService),
+    createSexRouter(sexService, {
+      enableDevelopmentCoinFlipReset: config.environment === 'development',
+    }),
+    createDateNightRouter(dateNightService),
+  );
   app.get('/api/v1/me', authMiddleware, meRoute);
 
-  app.use((_request, response) => {
+  app.use((request, response) => {
+    logDebug('http_route_not_found', {
+      method: request.method,
+      requestId: response.locals.requestId,
+    });
     response.status(404).json({
       message: 'Try GET /health',
       status: 'not_found',
@@ -99,9 +191,11 @@ export function createApp(
           ? error.status
           : 500;
     logError('http_request_error', {
-      error: error instanceof Error ? error.stack : String(error),
+      error,
       method: request.method,
-      path: request.path,
+      route: request.route
+        ? `${request.baseUrl}${String(request.route.path)}`
+        : 'unmatched',
       requestId: response.locals.requestId,
       statusCode,
     });
