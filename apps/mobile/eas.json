@@ -1,0 +1,33 @@
+{
+  "cli": {
+    "version": ">= 16.0.0",
+    "appVersionSource": "remote"
+  },
+  "build": {
+    "preview": {
+      "distribution": "internal",
+      "autoIncrement": true,
+      "node": "22.13.0",
+      "env": {
+        "EXPO_PUBLIC_LOG_LEVEL": "debug",
+        "EXPO_PUBLIC_ENV": "production"
+      }
+    },
+    "production": {
+      "autoIncrement": true,
+      "node": "22.13.0",
+      "env": {
+        "EXPO_PUBLIC_LOG_LEVEL": "silent",
+        "EXPO_PUBLIC_ENV": "production"
+      }
+    }
+  },
+  "submit": {
+    "production": {
+      "android": {
+        "track": "internal",
+        "releaseStatus": "draft"
+      }
+    }
+  }
+}

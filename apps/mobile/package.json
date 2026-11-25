@@ -6,11 +6,13 @@
     "@react-native-async-storage/async-storage": "2.2.0",
     "expo": "~58.0.26",
     "expo-auth-session": "~58.0.19",
+    "expo-build-properties": "~58.0.12",
     "expo-constants": "~58.0.16",
     "expo-crypto": "~58.0.8",
     "expo-font": "~58.0.12",
     "expo-linking": "~58.0.17",
     "expo-localization": "~58.0.5",
+    "expo-notifications": "~58.1.9",
     "expo-router": "~58.0.32",
     "expo-secure-store": "~58.0.3",
     "expo-splash-screen": "~58.0.14",
@@ -35,7 +37,10 @@
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web",
-    "lint": "expo lint"
+    "lint": "expo lint",
+    "build-preview": "npx --yes eas-cli@latest build --profile preview",
+    "build-production": "npx --yes eas-cli@latest build --profile production",
+    "build-and-submit-production-android": "npx --yes eas-cli@latest build --platform android --profile production --auto-submit"
   },
   "private": true
 }

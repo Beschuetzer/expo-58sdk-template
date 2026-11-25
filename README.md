@@ -148,9 +148,10 @@ The initializer assigns the Expo name, slug, deep-link scheme, iOS bundle ID,
 Android package, and production API/OIDC URLs. If no valid EAS project ID is
 configured, it runs EAS CLI to create or link a project and writes the UUID to
 the app config; sign in to Expo or choose an account when prompted. It creates
-no local API environment file. Local API, OAuth, and Expo settings are defined
-in `AppHost/Program.cs`; production credentials and other secrets must still
-be supplied through deployment configuration.
+no local API environment file. It also synchronizes the API audience and
+OAuth callback scheme in both EAS profiles. Local API, OAuth, and Expo settings
+are defined in `AppHost/Program.cs`; production credentials and other secrets
+must still be supplied through deployment configuration.
 
 Start the API, Expo, and MongoDB together:
 
@@ -218,10 +219,11 @@ Expo, so no generated `.env` file or separate mobile setup script is needed.
 To override the detected address (for example, when using a custom network),
 set `EXPO_PUBLIC_API_URL` in the AppHost configuration.
 
-The checked-in EAS `preview` and `production` profiles both provide
-`EXPO_PUBLIC_API_URL` and `EXPO_PUBLIC_IDP_URL`. Custom EAS profiles and other
-production builds must provide both values; the mobile config fails early if
-either is missing rather than relying on a hard-coded service URL.
+Run `npm run init` to populate the EAS `preview` and `production` profiles with
+the production API and identity-provider URLs, OAuth audience, and callback
+scheme. Custom EAS profiles and other production builds must provide
+`EXPO_PUBLIC_API_URL` and `EXPO_PUBLIC_IDP_URL`; the mobile config fails early
+if either is missing rather than relying on a hard-coded service URL.
 
 The mobile app includes a typed i18n provider with English, Spanish, and German
 translations. The device locale selects the initial language, and the language
@@ -256,7 +258,10 @@ release` workflow. Configure the real EAS project ID in `apps/mobile/app.json`
 and add an `EXPO_TOKEN` repository secret before starting a build; the workflow
 offers Android, iOS, and combined production builds. To start both platform
 builds from the repository root, run `npm run build:production`; it uses the
-`production` profile in `apps/mobile/eas.json`.
+`production` profile in `apps/mobile/eas.json`. Run
+`npm run build-and-submit:production:android` to build and auto-submit Android
+with that profile. Submissions go to the internal track as drafts and are not
+published automatically.
 
 ### Push notifications
 
@@ -274,8 +279,8 @@ with the API; EAS stores the credentials Expo needs to forward notifications to
 FCM and APNs. These credentials are not device tokens and must not be embedded
 in the app, added to `eas.json`, or committed to the repository.
 
-The app is already linked to EAS by the `owner` and `extra.eas.projectId` in
-[`apps/mobile/app.json`](./apps/mobile/app.json). Use an Expo account with
+Run `npm run init` to create or link the EAS project and write its project ID
+to [`apps/mobile/app.json`](./apps/mobile/app.json). Use an Expo account with
 access to that project when managing credentials. Device tokens are associated
 with the authenticated account, and mobile sign-out attempts to unregister the
 device token.
@@ -284,10 +289,12 @@ device token.
 
 The `preview` profile in [`apps/mobile/eas.json`](./apps/mobile/eas.json) uses
 internal distribution and points to the production API. The notifications
-plugin in [`apps/mobile/app.config.js`](./apps/mobile/app.config.js) selects the
-development APNs entitlement for this profile; `EXPO_PUBLIC_ENV=production`
-does not change that. This workspace has `preview` and `production` EAS build
-profiles; use `preview` for internal testing.
+plugin in [`apps/mobile/app.config.js`](./apps/mobile/app.config.js) sets the
+default Android notification channel. It does not select an APNs entitlement
+by EAS profile; Xcode changes the development entitlement to production when
+archiving a release build. The same config applies Android CMake 4.1.2 only
+during local development prebuilds. This workspace has `preview` and
+`production` EAS build profiles; use `preview` for internal testing.
 
 **Android (FCM V1)**
 

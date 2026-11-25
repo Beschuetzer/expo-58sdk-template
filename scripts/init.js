@@ -14,16 +14,28 @@ const sharedTypesPackagePath = path.join(
   'shared-types',
   'package.json',
 );
+const apiPackagePath = path.join(root, 'apps', 'api', 'package.json');
 const mobileAppConfigPath = path.join(root, 'apps', 'mobile', 'app.json');
 const mobileRoot = path.dirname(mobileAppConfigPath);
 const easConfigPath = path.join(root, 'apps', 'mobile', 'eas.json');
 const sharedTypesReferenceFiles = [
+  path.join(root, 'AGENTS.md'),
+  rootPackagePath,
+  apiPackagePath,
+  path.join(
+    root,
+    'apps',
+    'api',
+    'src',
+    'features',
+    'notifications',
+    'expoPush.ts',
+  ),
+  path.join(root, 'apps', 'api', 'src', 'logging.ts'),
   path.join(root, 'apps', 'api', 'src', 'routes', 'health.ts'),
+  path.join(root, 'apps', 'api', 'src', 'routes', 'mobileLogs.spec.ts'),
   path.join(root, 'apps', 'api', 'tsconfig.build.json'),
   path.join(root, 'apps', 'api', 'tsconfig.json'),
-  path.join(root, 'apps', 'mobile', 'app', '(tabs)', 'index.tsx'),
-  path.join(root, 'apps', 'mobile', 'features', 'backend', 'api.ts'),
-  path.join(root, 'apps', 'mobile', 'tsconfig.json'),
   path.join(root, 'README.md'),
 ];
 const templateSharedTypesName = '@expo-50sdk-template/shared-types';
@@ -48,6 +60,7 @@ function ensureEasProject() {
   const result = spawnSync(command, ['--yes', 'eas-cli@latest', 'init'], {
     cwd: mobileRoot,
     stdio: 'inherit',
+    shell: process.platform === 'win32',
   });
 
   if (result.error) {
@@ -91,9 +104,59 @@ function updateJson(filePath, update) {
   fs.writeFileSync(filePath, `${JSON.stringify(document, null, 2)}\n`, 'utf8');
 }
 
+function renameDependency(dependencies, oldName, newName) {
+  if (!dependencies || !Object.hasOwn(dependencies, oldName)) {
+    return;
+  }
+
+  dependencies[newName] = dependencies[oldName];
+  delete dependencies[oldName];
+}
+
+function renamePackageReferences(packageInfo, oldName, newName) {
+  if (!packageInfo || typeof packageInfo !== 'object') {
+    return;
+  }
+
+  if (packageInfo.name === oldName) {
+    packageInfo.name = newName;
+  }
+
+  for (const referenceType of [
+    'dependencies',
+    'devDependencies',
+    'optionalDependencies',
+    'peerDependencies',
+    'requires',
+  ]) {
+    const references = packageInfo[referenceType];
+    renameDependency(references, oldName, newName);
+    if (references && typeof references === 'object') {
+      for (const nestedPackageInfo of Object.values(references)) {
+        renamePackageReferences(nestedPackageInfo, oldName, newName);
+      }
+    }
+  }
+}
+
 function updatePackageNames(packageName, sharedTypesName) {
   updateJson(rootPackagePath, (packageJson) => {
     packageJson.name = packageName;
+  });
+
+  updateJson(apiPackagePath, (packageJson) => {
+    for (const dependencyType of [
+      'dependencies',
+      'devDependencies',
+      'optionalDependencies',
+      'peerDependencies',
+    ]) {
+      renameDependency(
+        packageJson[dependencyType],
+        templateSharedTypesName,
+        sharedTypesName,
+      );
+    }
   });
 
   updateJson(sharedTypesPackagePath, (packageJson) => {
@@ -114,11 +177,23 @@ function updatePackageNames(packageName, sharedTypesName) {
         oldSharedTypesEntry;
     }
 
-    if (lockfile.dependencies?.['@expo-50sdk-template/shared-types']) {
-      lockfile.dependencies[sharedTypesName] =
-        lockfile.dependencies['@expo-50sdk-template/shared-types'];
-      delete lockfile.dependencies['@expo-50sdk-template/shared-types'];
+    const lockfilePackageInfos = [
+      ...Object.values(lockfile.packages),
+      ...Object.values(lockfile.dependencies ?? {}),
+    ];
+    for (const packageInfo of lockfilePackageInfos) {
+      renamePackageReferences(
+        packageInfo,
+        templateSharedTypesName,
+        sharedTypesName,
+      );
     }
+
+    renameDependency(
+      lockfile.dependencies,
+      templateSharedTypesName,
+      sharedTypesName,
+    );
   });
 
   for (const filePath of sharedTypesReferenceFiles) {
@@ -131,44 +206,87 @@ function updatePackageNames(packageName, sharedTypesName) {
   }
 }
 
-async function ask(rl, label, defaultValue) {
-  const answer = (await rl.question(`${label} [${defaultValue}]: `)).trim();
-  return answer || defaultValue;
+function createPrompt(rl) {
+  const answers = rl[Symbol.asyncIterator]();
+  return async (label, defaultValue) => {
+    const defaultHint = defaultValue ? ` [${defaultValue}]` : '';
+    output.write(`${label}${defaultHint}: `);
+    const { value, done } = await answers.next();
+    const answer = done ? '' : value.trim();
+    return answer || defaultValue || '';
+  };
+}
+
+async function askRequired(prompt, label, defaultValue) {
+  const answer = await prompt(label, defaultValue);
+  if (!answer) {
+    throw new Error(`${label} is required.`);
+  }
+
+  return answer;
+}
+
+function normalizeServiceUrl(value, label) {
+  const normalizedValue = value.trim().replace(/\/+$/, '');
+  let url;
+  try {
+    url = new URL(normalizedValue);
+  } catch {
+    throw new Error(`${label} must be an absolute HTTP or HTTPS URL.`);
+  }
+
+  if (!['http:', 'https:'].includes(url.protocol) || !url.hostname) {
+    throw new Error(`${label} must be an absolute HTTP or HTTPS URL.`);
+  }
+
+  return normalizedValue;
 }
 
 async function main() {
   const rl = readline.createInterface({ input, output });
   try {
+    const prompt = createPrompt(rl);
     const defaultName =
       path.basename(root) === 'expo-50sdk-template'
         ? 'My Expo App'
         : path.basename(root);
-    const displayName = await ask(rl, 'Display name', defaultName);
-    const slug = await ask(rl, 'Expo slug', slugify(displayName));
+    const displayName = await prompt('Display name', defaultName);
+    const slug = await prompt('Expo slug', slugify(displayName));
     const identifier = compactIdentifier(slug);
     const mongoName = slugify(slug) || 'app';
     const sharedTypesName = `@${mongoName}/shared-types`;
-    const bundleIdentifier = await ask(
-      rl,
+    const bundleIdentifier = await prompt(
       'iOS bundle identifier',
       `com.${identifier}`,
     );
-    const androidPackage = await ask(rl, 'Android package', bundleIdentifier);
-    const scheme = await ask(rl, 'Deep-link scheme', identifier);
-    const apiUrl = await ask(
-      rl,
-      'Deployed API URL',
-      'https://your-production-api.example.com',
-    );
+    const androidPackage = await prompt('Android package', bundleIdentifier);
+    const scheme = await prompt('Deep-link scheme', identifier);
     const easConfig = JSON.parse(fs.readFileSync(easConfigPath, 'utf8'));
-    const issuerUrlDefault =
-      easConfig.build.production.env?.EXPO_PUBLIC_IDP_URL;
-    if (!issuerUrlDefault) {
-      throw new Error(
-        'EXPO_PUBLIC_IDP_URL must be set in the production EAS profile.',
-      );
+    for (const profileName of ['preview', 'production']) {
+      if (!easConfig.build?.[profileName]) {
+        throw new Error(
+          `apps/mobile/eas.json must define a ${profileName} build profile.`,
+        );
+      }
     }
-    const issuerUrl = await ask(rl, 'OAuth/OIDC issuer URL', issuerUrlDefault);
+
+    const productionEnv = easConfig.build.production.env ?? {};
+    const apiUrl = normalizeServiceUrl(
+      await askRequired(
+        prompt,
+        'Deployed API URL',
+        productionEnv.EXPO_PUBLIC_API_URL || process.env.EXPO_PUBLIC_API_URL,
+      ),
+      'Deployed API URL',
+    );
+    const issuerUrl = normalizeServiceUrl(
+      await askRequired(
+        prompt,
+        'OAuth/OIDC issuer URL',
+        productionEnv.EXPO_PUBLIC_IDP_URL || process.env.EXPO_PUBLIC_IDP_URL,
+      ),
+      'OAuth/OIDC issuer URL',
+    );
     const normalizedIssuerUrl = issuerUrl.replace(/\/+$/, '');
     const audience = `${normalizedIssuerUrl}/resources/api`;
 
@@ -194,6 +312,7 @@ async function main() {
           EXPO_PUBLIC_API_URL: apiUrl,
           EXPO_PUBLIC_IDP_URL: normalizedIssuerUrl,
           EXPO_PUBLIC_OAUTH_AUDIENCE: audience,
+          EXPO_PUBLIC_OAUTH_SCHEME: scheme,
         };
       }
     });
