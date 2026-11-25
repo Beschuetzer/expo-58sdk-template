@@ -1,5 +1,5 @@
 <Solution>
   <Folder Name="/AppHost/">
-    <Project Path="AppHost/Relationship.AppHost.csproj" />
+    <Project Path="AppHost/ExpoSDK58Template.AppHost.csproj" />
   </Folder>
 </Solution>

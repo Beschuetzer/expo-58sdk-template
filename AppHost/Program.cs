@@ -12,7 +12,7 @@ const string appEnvironment = "development";
 const string defaultAuthIssuerBaseUrl = "https://identity-beta.adammajor.com";
 const string defaultAuthClientId = "client_ASCACaC-QT2cM8DmF2IroxFe";
 const string defaultOAuthScopes =
-    "openid profile email offline_access relationships:read relationships:create relationships:invite relationships:accept-invite payment-requests:read payment-requests:write";
+    "openid profile email offline_access";
 
 var authIssuerBaseUrl =
     builder.Configuration["AUTH_ISSUER_BASE_URL"]?.Trim().TrimEnd('/')
@@ -30,7 +30,7 @@ var corsOrigin =
 var oauthScopes =
     builder.Configuration["EXPO_PUBLIC_OAUTH_SCOPES"] ?? defaultOAuthScopes;
 var oauthScheme =
-    builder.Configuration["EXPO_PUBLIC_OAUTH_SCHEME"] ?? "relationshipapp";
+    builder.Configuration["EXPO_PUBLIC_OAUTH_SCHEME"] ?? "expo";
 var apiPortValue = apiPort.ToString();
 var configuredApiOtlpLogsEndpoint =
     builder.Configuration["OTEL_EXPORTER_OTLP_LOGS_ENDPOINT"]?.Trim();
@@ -55,11 +55,11 @@ var shouldSeedData = builder.AddParameter("seedData", "true");
 var mongo = builder.AddMongoDB("mongo")
     .WithoutHttpsCertificate()
     .WithReplicaSet()
-    .WithDataVolume("relationship-app-mongodb-data")
+    .WithDataVolume("expoSDK58-template-data")
     .WithLifetime(ContainerLifetime.Persistent);
 #pragma warning restore ASPIRECERTIFICATES001, ASPIREMONGODB001
 
-var database = mongo.AddDatabase("relationship-dev", "relationship_dev");
+var database = mongo.AddDatabase("expoSDK58-template-dev", "expoSDK58-template_dev");
 
 var grafana = builder.AddContainer("grafana", "grafana/otel-lgtm", "latest")
     .WithHttpEndpoint(
@@ -75,7 +75,7 @@ var grafana = builder.AddContainer("grafana", "grafana/otel-lgtm", "latest")
         isProxied: false
     );
 
-var api = builder.AddExecutable("api", "npm", "../apps/api", "run", "apphost:dev")
+var api = builder.AddExecutable("api", "npm", "../apps/api", "run", "start:dev")
     .WithHttpEndpoint(port: apiPort, targetPort: apiPort, name: "http", isProxied: false)
     .WithEnvironment("NODE_ENV", appEnvironment)
     .WithEnvironment("HOST", "0.0.0.0")
@@ -92,7 +92,7 @@ var api = builder.AddExecutable("api", "npm", "../apps/api", "run", "apphost:dev
     .WaitFor(database)
     .WaitFor(grafana);
 
-var mobile = builder.AddExecutable("mobile", "npm", "../apps/mobile", "run", "apphost:dev")
+var mobile = builder.AddExecutable("mobile", "npm", "../apps/mobile", "run", "start")
     .WithEnvironment("EXPO_PUBLIC_ENV", appEnvironment)
     .WithEnvironment("EXPO_PUBLIC_API_URL", mobileApiUrl)
     .WithEnvironment("EXPO_PUBLIC_LOG_LEVEL", mobileLogLevel)
