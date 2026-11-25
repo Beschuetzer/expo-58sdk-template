@@ -17,6 +17,9 @@
   },
   "include": [
     "src/**/*.ts",
+    "prisma/seed-dev.ts",
+    "prisma/seed-examples.ts",
+    "prisma/seed-dev.spec.ts",
     "../../libs/shared-types/src/**/*.ts"
   ]
 }

@@ -8,11 +8,12 @@
   "scripts": {
     "apphost:dev": "node --import tsx --watch src/main.ts",
     "build": "tsc -p tsconfig.build.json",
-    "test": "tsx --test src/app.spec.ts src/features/notifications/expoPush.spec.ts src/routes/mobileLogs.spec.ts src/logging.spec.ts",
+    "test": "tsx --test src/app.spec.ts src/features/notifications/expoPush.spec.ts src/routes/mobileLogs.spec.ts src/logging.spec.ts prisma/seed-dev.spec.ts",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "prisma:generate": "prisma generate --schema=./prisma/schema.prisma",
     "prisma:studio": "prisma studio --schema=./prisma/schema.prisma",
     "prisma:push": "prisma db push --schema=./prisma/schema.prisma",
-    "prisma:validate": "prisma validate --schema=./prisma/schema.prisma"
+    "prisma:validate": "prisma validate --schema=./prisma/schema.prisma",
+    "prisma:seed:dev": "tsx prisma/seed-dev.ts"
   }
 }

@@ -8,6 +8,7 @@ Node.js HTTP API for local development and production-oriented extension.
 - `src/auth`: OAuth2 bearer-token middleware and the injectable auth boundary.
 - `src/features/notifications`: reusable Expo push message sender.
 - `src/routes`: health, current-user, and mobile telemetry route handlers.
+- `prisma/seed-dev.ts`: development-only seed command for generic example data.
 - `src/app.ts`: Express middleware and versioned route composition, independent of the listening socket.
 - `src/server.ts`: server creation, startup, and shutdown lifecycle.
 - `src/main.ts`: process entrypoint and signal handling.
@@ -68,6 +69,8 @@ resource server.
 - `POST /api/v1/telemetry/logs` accepts authenticated mobile log batches in development.
 - `POST /auth/token`, `POST /auth/refresh`, and `POST /auth/logout` support the
   OAuth2 BFF session flow; `GET /auth/session` checks the current session.
+- `npm run prisma:seed:dev --workspace=api` upserts ten `Example` records. Set
+  `NODE_ENV=development` and configure `DATABASE_URL` before running it.
 - `npm run test --workspace=api` runs the API contract tests.
 - `npm run typecheck --workspace=api` validates TypeScript without emitting files.
 - `npm run api:build` generates Prisma and library artifacts, then emits the API to `dist/apps/api`.
