@@ -5,6 +5,8 @@ import { useEffect } from 'react';
 import 'react-native-reanimated';
 
 import { useColorScheme } from '@/components/useColorScheme';
+import { I18nProvider, useI18n } from '@/utils/i18n';
+import { ThemeModeProvider } from '@/utils/theme';
 
 export {
   // Catch any errors thrown by the Layout component.
@@ -39,16 +41,27 @@ export default function RootLayout() {
     return null;
   }
 
-  return <RootLayoutNav />;
+  return (
+    <I18nProvider>
+      <ThemeModeProvider>
+        <RootLayoutNav />
+      </ThemeModeProvider>
+    </I18nProvider>
+  );
 }
 
 function RootLayoutNav() {
   const colorScheme = useColorScheme();
+  const { t } = useI18n();
 
   return (
     <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
       <Stack>
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+        <Stack.Screen
+          name="settings"
+          options={{ title: t('settings.title') }}
+        />
         <Stack.Screen name="modal" options={{ presentation: 'modal' }} />
       </Stack>
     </ThemeProvider>
