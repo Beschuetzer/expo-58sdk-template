@@ -17,8 +17,6 @@
   },
   "include": [
     "src/**/*.ts",
-    "prisma/seed-featured-users.ts",
-    "prisma/seed-featured-users.spec.ts",
     "../../libs/shared-types/src/**/*.ts"
   ]
 }

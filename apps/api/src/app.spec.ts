@@ -147,6 +147,23 @@ test('unknown routes return a not found response', async (t) => {
   assert.equal(response.body.status, 'not_found');
 });
 
+test('relationship app routes are not registered in the starter API', async (t) => {
+  const authenticated: RequestHandler = (_request, _response, next) => next();
+  const server = createServer(
+    createApp(loadConfig({}), { authMiddleware: authenticated }),
+  );
+  await listen(server);
+  t.after(() => server.close());
+
+  const response = await get(
+    server,
+    '/api/v1/relationships/relationship-123/budgets',
+  );
+
+  assert.equal(response.statusCode, 404);
+  assert.equal(response.body.status, 'not_found');
+});
+
 test('protected routes require OAuth2 configuration by default', async (t) => {
   const server = createServer(createApp(loadConfig({})));
   await listen(server);

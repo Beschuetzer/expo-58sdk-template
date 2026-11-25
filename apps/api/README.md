@@ -6,7 +6,8 @@ Node.js HTTP API for local development and production-oriented extension.
 
 - `src/config`: environment parsing and validated runtime configuration.
 - `src/auth`: OAuth2 bearer-token middleware and the injectable auth boundary.
-- `src/routes`: individual HTTP route handlers.
+- `src/features/notifications`: reusable Expo push message sender.
+- `src/routes`: health, current-user, and mobile telemetry route handlers.
 - `src/app.ts`: Express middleware and versioned route composition, independent of the listening socket.
 - `src/server.ts`: server creation, startup, and shutdown lifecycle.
 - `src/main.ts`: process entrypoint and signal handling.
@@ -26,19 +27,9 @@ for deployed environments:
 - `DATABASE_URL`: MongoDB connection string for Prisma. Required for database access.
 - `AUTH_ISSUER_BASE_URL`: OAuth2/OIDC issuer base URL. Required for protected routes.
 - `AUTH_AUDIENCE`: expected OAuth2 access-token audience. Required for protected routes.
-- `AUTH_REQUIRED_SCOPES`: optional space- or comma-separated baseline scopes required by all protected routes. Feature-specific scopes are enforced at route level.
-
-Relationship, payment-request, and joint-account-charge routes use these
-resource-server permissions:
-
-```text
-relationships:read
-relationships:create
-relationships:invite
-relationships:accept-invite
-payment-requests:read
-payment-requests:write
-```
+- `AUTH_REQUIRED_SCOPES`: optional space- or comma-separated scopes required by all protected routes.
+- `AUTH_CLIENT_ID`: OAuth client ID used by the BFF routes; defaults to `mobile-development-client`.
+- `CORS_ORIGIN`: allowed browser origin; defaults to `http://localhost:8081`.
 
 API and mobile logs use the shared structured logger in `libs/logging`. Set
 `LOG_LEVEL` for the API or `EXPO_PUBLIC_LOG_LEVEL` for the Expo app. The chosen
@@ -48,7 +39,10 @@ identifier-bearing paths.
 
 ## Prisma + MongoDB
 
-This API is preconfigured for Prisma with a MongoDB datasource so you can attach a document-backed database without custom driver glue.
+This API is preconfigured for Prisma with a MongoDB datasource so you can
+attach a document-backed database without custom driver glue. The schema
+contains generic `Example`, `Notification`, and `NotificationPushToken` models;
+keep or replace them as appropriate for your app.
 
 The AppHost provisions local MongoDB and supplies `DATABASE_URL`. For deployed
 environments, provide the database connection string through the hosting
@@ -60,39 +54,24 @@ platform's configuration.
 
 For MongoDB, Prisma uses the native `mongodb` provider and document IDs are represented as `ObjectId` strings.
 
-AppHost supplies the same issuer, audience, and client configuration to the API
-and Expo app. Deployed APIs must receive their own `AUTH_ISSUER_BASE_URL` and
+AppHost supplies the issuer, audience, and client configuration to the API and
+Expo app. Deployed APIs must receive their own `AUTH_ISSUER_BASE_URL` and
 `AUTH_AUDIENCE` values from deployment configuration. Clients must send the
 OAuth access token as the bearer token. The ID token is for the OAuth client
 and has the client ID as its audience, so it is correctly rejected by this
 resource server.
 
-## Commands
+## Routes and commands
 
 - `GET /health` returns a public JSON health response for deployment probes.
 - `GET /api/v1/me` is a protected example resource and requires a valid OAuth2 bearer token.
-- `POST /api/v1/relationships/:relationshipId/invitations` creates a one-time invitation link for a relationship owner.
-- `GET /api/v1/invitations/:token` previews an invitation for an authenticated user.
-- `POST /api/v1/invitations/:token/accept` accepts an invitation using the authenticated user's subject claim.
-- `GET` and `POST /api/v1/relationships/:relationshipId/joint-account-charges` list and create relationship charges.
-- `GET /api/v1/joint-account-charges/:chargeId` returns a charge to any active relationship member.
-- `POST /api/v1/joint-account-charges/:chargeId/update` edits a charge's name, amount, and date; only its creator can edit it.
-- `POST /api/v1/joint-account-charges/:chargeId/mark-paid` marks an unpaid charge as paid; only its creator can mark it paid.
-- `GET` and `POST /api/v1/relationships/:relationshipId/budgets` list and create calendar-based recurring budgets.
-- `GET`, `PATCH`, and `DELETE /api/v1/budgets/:budgetId` read, edit, and delete a budget; deletion removes the recurring series.
-- `POST /api/v1/budgets/:budgetId/approval` records a required member's approval.
-- `POST /api/v1/budgets/:budgetId/items` adds a dated item to an approved budget.
-- Budgets use ISO currency codes; legacy budgets without a currency are treated as USD.
-- Approved budgets renew for the next monthly, quarterly, or yearly period. Editing resets required approvals.
+- `POST /api/v1/telemetry/logs` accepts authenticated mobile log batches in development.
+- `POST /auth/token`, `POST /auth/refresh`, and `POST /auth/logout` support the
+  OAuth2 BFF session flow; `GET /auth/session` checks the current session.
 - `npm run test --workspace=api` runs the API contract tests.
 - `npm run typecheck --workspace=api` validates TypeScript without emitting files.
 - `npm run api:build` generates Prisma and library artifacts, then emits the API to `dist/apps/api`.
 - `npm run dev` starts the API, mobile app, and MongoDB through the C# Aspire 17 AppHost in `AppHost/`.
-
-Sex status and mutation requests include an optional `today` value in
-`YYYY-MM-DD` form. The mobile app derives it from the device's local calendar
-with date-fns; the API accepts only dates within one calendar day of its UTC
-date, preventing a UTC midnight rollover from advancing the app's local day.
 
 ### OAuth2 architecture
 

@@ -9,8 +9,8 @@ import {
 
 const message: ExpoPushMessage = {
   to: 'ExpoPushToken[device-123]',
-  title: 'Request update',
-  body: 'A request needs your attention.',
+  title: 'Example notification',
+  body: 'A notification is ready.',
   sound: 'default',
   channelId: 'default',
   data: {

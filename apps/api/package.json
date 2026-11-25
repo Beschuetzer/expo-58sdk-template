@@ -3,18 +3,16 @@
   "private": true,
   "dependencies": {
     "@expo-50sdk-template/logging": "*",
-    "@expo-50sdk-template/shared-types": "*",
-    "date-fns": "^4.1.0"
+    "@expo-50sdk-template/shared-types": "*"
   },
   "scripts": {
     "apphost:dev": "node --import tsx --watch src/main.ts",
     "build": "tsc -p tsconfig.build.json",
-    "test": "tsx --test src/app.spec.ts src/features/budgets/routes.spec.ts src/features/budgets/service.spec.ts src/features/paymentRequests/routes.spec.ts src/features/paymentRequests/service.spec.ts src/features/paymentRequests/expoPush.spec.ts src/features/jointAccountCharges/routes.spec.ts src/features/jointAccountCharges/service.spec.ts src/features/relationshipRules/routes.spec.ts src/features/relationshipRules/service.spec.ts src/features/time/routes.spec.ts src/features/time/service.spec.ts src/features/sex/routes.spec.ts src/features/sex/service.spec.ts src/features/dateNights/routes.spec.ts src/features/dateNights/service.spec.ts src/routes/mobileLogs.spec.ts src/logging.spec.ts prisma/seed-featured-users.spec.ts",
+    "test": "tsx --test src/app.spec.ts src/features/notifications/expoPush.spec.ts src/routes/mobileLogs.spec.ts src/logging.spec.ts",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "prisma:generate": "prisma generate --schema=./prisma/schema.prisma",
     "prisma:studio": "prisma studio --schema=./prisma/schema.prisma",
     "prisma:push": "prisma db push --schema=./prisma/schema.prisma",
-    "prisma:validate": "prisma validate --schema=./prisma/schema.prisma",
-    "prisma:seed:dev": "tsx prisma/seed-dev.ts"
+    "prisma:validate": "prisma validate --schema=./prisma/schema.prisma"
   }
 }
